@@ -1,6 +1,8 @@
 import { audioCtxManager } from './audio.context';
 import { AcousticMathEngine } from '../math/acoustic.math';
 
+export type RecorderErrorType = 'permission_denied' | 'not_found' | 'unsupported';
+
 export interface RecorderState {
   isRecording: boolean;
   decibels: number;
@@ -15,9 +17,15 @@ export class VoiceRecorderService {
   private recordedChunks: Blob[] = [];
   private animId: number | null = null;
   private listener: ((state: RecorderState) => void) | null = null;
+  private errorListener: ((error: RecorderErrorType) => void) | null = null;
   private lastBlobUrl: string | null = null;
 
   async start(): Promise<boolean> {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      this.errorListener?.('unsupported');
+      return false;
+    }
+
     try {
       this.recordedChunks = [];
       if (this.lastBlobUrl) {
@@ -26,13 +34,17 @@ export class VoiceRecorderService {
       }
 
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const ctx = audioCtxManager.getContext();
+      const ctx = await audioCtxManager.ensureResumed();
       const source = ctx.createMediaStreamSource(this.stream);
       this.analyser = ctx.createAnalyser();
       this.analyser.fftSize = 64;
       source.connect(this.analyser);
 
-      this.mediaRecorder = new MediaRecorder(this.stream);
+      const mimeType = this.detectMimeType();
+      this.mediaRecorder = mimeType
+        ? new MediaRecorder(this.stream, { mimeType })
+        : new MediaRecorder(this.stream);
+
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.recordedChunks.push(e.data);
       };
@@ -40,7 +52,12 @@ export class VoiceRecorderService {
       this.mediaRecorder.start(100);
       this.startPolling();
       return true;
-    } catch {
+    } catch (err) {
+      const name = (err as { name?: string })?.name || '';
+      const errType: RecorderErrorType =
+        name === 'NotFoundError' ? 'not_found' : 'permission_denied';
+      this.errorListener?.(errType);
+      this.cleanup();
       return false;
     }
   }
@@ -49,22 +66,22 @@ export class VoiceRecorderService {
     return new Promise((resolve) => {
       this.stopPolling();
       if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        this.cleanup();
         resolve(null);
         return;
       }
 
+      const mime = this.mediaRecorder.mimeType || 'audio/webm';
       this.mediaRecorder.onstop = () => {
-        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+        const blob = new Blob(this.recordedChunks, { type: mime });
         this.lastBlobUrl = URL.createObjectURL(blob);
         this.cleanup();
-        if (this.listener) {
-          this.listener({
-            isRecording: false,
-            decibels: -60,
-            amplitudes: [],
-            recordedAudioUrl: this.lastBlobUrl,
-          });
-        }
+        this.listener?.({
+          isRecording: false,
+          decibels: -60,
+          amplitudes: [],
+          recordedAudioUrl: this.lastBlobUrl,
+        });
         resolve(this.lastBlobUrl);
       };
 
@@ -72,8 +89,35 @@ export class VoiceRecorderService {
     });
   }
 
-  onStateChange(cb: (state: RecorderState) => void): void {
+  onStateChange(cb: ((state: RecorderState) => void) | null): void {
     this.listener = cb;
+  }
+
+  onError(cb: ((error: RecorderErrorType) => void) | null): void {
+    this.errorListener = cb;
+  }
+
+  destroy(): void {
+    this.stopPolling();
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try {
+        this.mediaRecorder.stop();
+      } catch {
+        // Ignore stop errors during unmount
+      }
+    }
+    this.cleanup();
+    if (this.lastBlobUrl) {
+      URL.revokeObjectURL(this.lastBlobUrl);
+      this.lastBlobUrl = null;
+    }
+    this.listener = null;
+    this.errorListener = null;
+  }
+
+  private detectMimeType(): string | undefined {
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type));
   }
 
   private startPolling(): void {
@@ -84,7 +128,7 @@ export class VoiceRecorderService {
 
       let sumSquares = 0;
       const normalizedAmps: number[] = [];
-      for (let i = 0; i < buffer.length; i++) {
+      for (let i = 0; i < buffer.length; i += 1) {
         const norm = buffer[i] / 255.0;
         normalizedAmps.push(norm);
         sumSquares += norm * norm;
@@ -93,21 +137,19 @@ export class VoiceRecorderService {
       const rms = Math.sqrt(sumSquares / buffer.length);
       const db = AcousticMathEngine.calculateDecibels(rms);
 
-      if (this.listener) {
-        this.listener({
-          isRecording: true,
-          decibels: db,
-          amplitudes: normalizedAmps,
-          recordedAudioUrl: null,
-        });
-      }
+      this.listener?.({
+        isRecording: true,
+        decibels: db,
+        amplitudes: normalizedAmps,
+        recordedAudioUrl: null,
+      });
       this.animId = requestAnimationFrame(poll);
     };
     this.animId = requestAnimationFrame(poll);
   }
 
   private stopPolling(): void {
-    if (this.animId) cancelAnimationFrame(this.animId);
+    if (this.animId !== null) cancelAnimationFrame(this.animId);
     this.animId = null;
   }
 

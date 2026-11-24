@@ -3,6 +3,7 @@ export interface QuizQuestion {
   type: 'theory' | 'gapFill' | 'voice';
   prompt: string;
   targetVerse?: string;
+  targetSimple?: string;
   options?: string[];
   correctAnswer: string;
 }
@@ -36,13 +37,14 @@ export const QUIZ_BANK: QuizQuestion[] = [
     prompt: 'أكمل الآية الكريمة بالكلمة الصحيحة:',
     targetVerse: 'إِنَّآ أَعْطَيْنَٰكَ _____',
     options: ['ٱلْكَوْثَرَ', 'ٱلنَّصْرَ', 'ٱلْفَتْحَ'],
-    correctAnswer: 'ٱلكَوْثَرَ',
+    correctAnswer: 'ٱلْكَوْثَرَ',
   },
   {
     id: 5,
     type: 'voice',
     prompt: 'رتل الآية الكريمة بإتقان ومخارج واضحة:',
     targetVerse: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ',
+    targetSimple: 'قل هو الله احد',
     correctAnswer: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ',
   },
 ];

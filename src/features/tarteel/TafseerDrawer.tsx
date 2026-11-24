@@ -13,7 +13,15 @@ export const TafseerDrawer: React.FC<TafseerDrawerProps> = ({ ayah, onClose }) =
     <AppModal title={STRINGS.tafseerTitle} isOpen={Boolean(ayah)} onClose={onClose}>
       {ayah && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-          <div style={{ textAlign: 'center', fontFamily: 'var(--font-quran)', fontSize: '1.5rem', lineHeight: 2 }}>
+          <div
+            style={{
+              textAlign: 'center',
+              fontFamily: 'var(--font-quran)',
+              fontSize: '1.55rem',
+              lineHeight: 2.1,
+              color: 'var(--color-brand-primary)',
+            }}
+          >
             {ayah.textUthmanic}
           </div>
           <div
@@ -21,7 +29,8 @@ export const TafseerDrawer: React.FC<TafseerDrawerProps> = ({ ayah, onClose }) =
               backgroundColor: 'var(--color-surface-subtle)',
               padding: 'var(--spacing-md)',
               borderRadius: 'var(--radius-md)',
-              lineHeight: 1.8,
+              lineHeight: 1.85,
+              fontSize: '0.98rem',
               color: 'var(--color-text-secondary)',
             }}
           >

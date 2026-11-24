@@ -1,50 +1,83 @@
 export const STRINGS = {
   // Navigation
   appName: 'المعلم القرآني',
-  navLearn: 'التعلم',
+  navLearn: 'التجويد',
   navTarteel: 'المصحف',
   navQuiz: 'الاختبارات',
-  navProgress: 'إنجازاتي',
+  navProgress: 'الإنجاز',
 
   // Actions & Buttons
-  btnListen: 'استمع',
-  btnRecord: 'سجل صوتك',
+  btnListen: 'استماع',
+  btnRecord: 'تسجيل التلاوة',
   btnStopRecord: 'إيقاف',
-  btnCompare: 'قارن تلاوتك',
+  btnCompare: 'مقارنة التلاوة',
   btnPlay: 'تشغيل',
   btnPause: 'إيقاف مؤقت',
-  btnRepeat: 'كرر معي',
-  btnSubmit: 'تحقق الآن',
-  btnNext: 'السؤال التالي',
-  btnRetry: 'حاول ثانية',
+  btnRepeat: 'تكرار',
+  btnSubmit: 'تحقق',
+  btnNext: 'التالي',
+  btnRetry: 'أعد المحاولة',
   btnClose: 'إغلاق',
 
   // Titles & Headings
   learnTitle: 'أحكام التجويد',
-  tarteelTitle: 'المصحف الشريف',
+  tarteelTitle: 'المصحف المرتل',
   tafseerTitle: 'التفسير الميسر',
   quizTitle: 'ساحة الاختبارات',
-  treeTitle: 'شجرة الإنجاز',
-  treeSubtitle: 'ثمار الحفظ',
+  treeTitle: 'سجل الإنجاز',
+  treeSubtitle: 'حصاد الحفظ',
 
   // Quiz Modes
   quizTheory: 'اختبار المعرفة',
-  quizVoice: 'اختبار الترتيل',
+  quizVoice: 'التسميع الصوتي',
   quizGapFill: 'إكمال الآية',
 
   // Labels & Badges
-  labelStars: 'النجوم المكتسبة',
+  labelStars: 'النجوم',
   labelSurah: 'السورة',
   labelAyah: 'الآية',
-  labelMakhraj: 'مخرج الحرف',
-  labelExample: 'المثال القرآني',
+  labelMakhraj: 'المخرج',
+  labelExample: 'المثال',
   stageLevel: 'المستوى',
   searchSurah: 'ابحث عن سورة...',
+  reciterLabel: 'القارئ',
+  masteredLabel: 'الآيات المتقنة',
+  ayahCountUnit: 'آية',
+  surahTypeMakki: 'مكية',
+  surahTypeMadani: 'مدنية',
+
+  // Hifz & Hidden Ayah Mode
+  modeRead: 'وضع التلاوة',
+  modeHifz: 'وضع الحفظ',
+  btnStartHifz: 'ابدأ التسميع',
+  btnStopHifz: 'إنهاء التسميع',
+  btnHideAll: 'إخفاء الكل',
+  btnRevealAll: 'كشف الكل',
+  btnHintWord: 'تلميح كلمة',
+  btnRevealAyah: 'كشف الآية',
+  hiddenAyahPrompt: 'اقرأ لتظهر الآية',
+  statusMismatch: 'تنبيه خطأ',
+  statusRevealed: 'تم الكشف',
+  statusFallbackMode: 'تحقق صوتي مرن',
+  confirmRevealManual: 'تحقق صوتي',
+
+  // Theme & Audio Feedback Controls
+  themeNight: 'الوضع الليلي',
+  themeLight: 'الوضع النهاري',
+  soundOn: 'رنين التنبيه',
+  soundOff: 'كتم التنبيه',
+
+  // Status & Errors
+  loadingSurah: 'جاري التحميل...',
+  noSurahFound: 'لا توجد نتائج',
+  micDenied: 'اسمح بالميكروفون',
+  speechUnsupported: 'استخدم الكشف اليدوي',
+  tafseerFallback: 'التفسير غير متاح',
 
   // Feedback
-  feedbackSuccess: 'أحسنت يا بطل',
-  feedbackTryAgain: 'حاول مرة أخرى',
+  feedbackSuccess: 'أحسنت',
+  feedbackTryAgain: 'حاول ثانية',
   promptSpeak: 'رتل الآية الكريمة',
-  promptListening: 'جارٍ الاستماع...',
-  correctAnswerWas: 'الإجابة الصحيحة هي',
+  promptListening: 'جاري الاستماع...',
+  correctAnswerWas: 'الإجابة الصحيحة',
 } as const;

@@ -1,38 +1,50 @@
-:root {
-  /* Surfaces & Canvas */
-  --color-canvas-bg: #F8FAFC;
-  --color-surface-primary: #FFFFFF;
-  --color-surface-subtle: #F1F5F9;
-  --color-surface-interactive: #E2E8F0;
+/* Universal All-Ages Quranic Design System */
+:root,
+[data-theme="light"] {
+  /* Surfaces & Parchment Canvas */
+  --color-canvas-bg: #F6F4EE;
+  --color-surface-primary: #FFFDF8;
+  --color-surface-subtle: #EDE9DF;
+  --color-surface-interactive: #DDD6C7;
 
-  /* Brand Harmonic Kid-Friendly Tokens */
-  --color-brand-primary: #4F46E5;
-  --color-brand-secondary: #0EA5E9;
-  --color-brand-accent: #F59E0B;
+  /* Dignified All-Ages Emerald & Gold Tokens */
+  --color-brand-primary: #0F5132;
+  --color-brand-secondary: #155E75;
+  --color-brand-accent: #B45309;
 
-  /* Behavioral Feedback */
-  --color-feedback-success: #10B981;
-  --color-feedback-alert: #EF4444;
-  --color-feedback-warning: #F97316;
-  --color-reward-gold: #FBBF24;
+  /* Behavioral & Audio Feedback */
+  --color-feedback-success: #0D7A54;
+  --color-feedback-alert: #B91C1C;
+  --color-feedback-warning: #C2410C;
+  --color-reward-gold: #C89B3C;
 
-  /* Typography & Hierarchy */
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94A3B8;
-  --color-text-inverse: #FFFFFF;
+  /* Tints & Masking Surfaces */
+  --color-mask-surface: #E7E2D5;
+  --color-mask-border: #C9BFA9;
+  --color-primary-tint: rgba(15, 81, 50, 0.08);
+  --color-success-tint: rgba(13, 122, 84, 0.11);
+  --color-alert-tint: rgba(185, 28, 28, 0.11);
+  --color-backdrop-modal: rgba(28, 25, 23, 0.56);
+  --color-shadow-card: rgba(28, 25, 23, 0.06);
+  --color-shadow-elevated: rgba(28, 25, 23, 0.15);
+
+  /* Typography & Ink Hierarchy */
+  --color-text-primary: #1C1917;
+  --color-text-secondary: #57534E;
+  --color-text-muted: #8A837A;
+  --color-text-inverse: #FFFDF8;
 
   /* Tajweed Semantic Rules */
-  --color-tajweed-ghunnah: #16A34A;
-  --color-tajweed-qalqalah: #2563EB;
-  --color-tajweed-ikhfa: #EA580C;
-  --color-tajweed-idgham: #7C3AED;
-  --color-tajweed-madd: #DC2626;
+  --color-tajweed-ghunnah: #0F766E;
+  --color-tajweed-qalqalah: #1D4ED8;
+  --color-tajweed-ikhfa: #B45309;
+  --color-tajweed-idgham: #6D28D9;
+  --color-tajweed-madd: #B91C1C;
 
   /* Audio & Visualizer */
-  --color-wave-active: #3B82F6;
-  --color-wave-inactive: #CBD5E1;
-  --color-mic-recording: #E11D48;
+  --color-wave-active: #0F5132;
+  --color-wave-inactive: #D1C9B8;
+  --color-mic-recording: #B91C1C;
 
   /* Dimensions & Spacing */
   --spacing-xs: 4px;
@@ -41,15 +53,55 @@
   --spacing-lg: 24px;
   --spacing-xl: 32px;
 
-  /* Radii for Child Ergonomics */
+  /* Ergonomic Radii */
   --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-pill: 9999px;
 
   /* Typography Families */
   --font-quran: 'Amiri Quran', serif;
   --font-general: 'Cairo', sans-serif;
+}
+
+[data-theme="night"] {
+  --color-canvas-bg: #0D1318;
+  --color-surface-primary: #151E26;
+  --color-surface-subtle: #1D2832;
+  --color-surface-interactive: #2D3B48;
+
+  --color-brand-primary: #2D9A6B;
+  --color-brand-secondary: #3898B8;
+  --color-brand-accent: #D4A349;
+
+  --color-feedback-success: #34D399;
+  --color-feedback-alert: #F87171;
+  --color-feedback-warning: #FB923C;
+  --color-reward-gold: #D4A349;
+
+  --color-mask-surface: #1B2530;
+  --color-mask-border: #334252;
+  --color-primary-tint: rgba(45, 154, 107, 0.14);
+  --color-success-tint: rgba(52, 211, 153, 0.12);
+  --color-alert-tint: rgba(248, 113, 113, 0.15);
+  --color-backdrop-modal: rgba(4, 8, 12, 0.78);
+  --color-shadow-card: rgba(0, 0, 0, 0.28);
+  --color-shadow-elevated: rgba(0, 0, 0, 0.50);
+
+  --color-text-primary: #F2EFE9;
+  --color-text-secondary: #B8B2A6;
+  --color-text-muted: #7C8894;
+  --color-text-inverse: #0D1318;
+
+  --color-tajweed-ghunnah: #34D399;
+  --color-tajweed-qalqalah: #60A5FA;
+  --color-tajweed-ikhfa: #FB923C;
+  --color-tajweed-idgham: #A78BFA;
+  --color-tajweed-madd: #F87171;
+
+  --color-wave-active: #2D9A6B;
+  --color-wave-inactive: #33414E;
+  --color-mic-recording: #F87171;
 }
 
 * {
@@ -65,4 +117,19 @@ body {
   font-family: var(--font-general);
   user-select: none;
   min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-canvas-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-interactive);
+  border-radius: var(--radius-pill);
 }

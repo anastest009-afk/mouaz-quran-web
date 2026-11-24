@@ -1,4 +1,4 @@
-import { ChildProgress } from './types';
+import { AyahProgress } from './types';
 
 const STORAGE_KEYS = {
   PROGRESS: 'mouaz_child_progress',
@@ -6,16 +6,16 @@ const STORAGE_KEYS = {
 };
 
 export class StorageService {
-  static getProgress(): Record<string, ChildProgress> {
+  static getProgress(): Record<string, AyahProgress> {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PROGRESS);
-      return data ? JSON.parse(data) : {};
+      return data ? (JSON.parse(data) as Record<string, AyahProgress>) : {};
     } catch {
       return {};
     }
   }
 
-  static saveAyahProgress(progress: ChildProgress): void {
+  static saveAyahProgress(progress: AyahProgress): void {
     const all = this.getProgress();
     const key = `${progress.surahNumber}_${progress.ayahNumber}`;
     const existing = all[key];
@@ -27,7 +27,11 @@ export class StorageService {
       isMastered: (existing?.isMastered || false) || progress.isMastered,
     };
 
-    localStorage.setItem(STORAGE_KEYS.PROGRESS, JSON.stringify(all));
+    try {
+      localStorage.setItem(STORAGE_KEYS.PROGRESS, JSON.stringify(all));
+    } catch {
+      // Ignore storage quota failure
+    }
   }
 
   static getTotalStars(): number {
@@ -45,6 +49,10 @@ export class StorageService {
   }
 
   static setActiveReciterId(id: string): void {
-    localStorage.setItem(STORAGE_KEYS.SELECTED_RECITER, id);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_RECITER, id);
+    } catch {
+      // Ignore storage failure
+    }
   }
 }

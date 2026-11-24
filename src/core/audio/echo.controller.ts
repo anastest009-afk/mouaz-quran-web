@@ -11,17 +11,19 @@ export class EchoController {
   private listener: ((state: EchoState, score?: number) => void) | null = null;
   private startTime = 0;
   private targetDurationMs = 3000;
+  private echoTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(player: AudioPlayerService, recorder: VoiceRecorderService) {
     this.player = player;
     this.recorder = recorder;
   }
 
-  onState(cb: (state: EchoState, score?: number) => void): void {
+  onState(cb: ((state: EchoState, score?: number) => void) | null): void {
     this.listener = cb;
   }
 
   async startCycle(sheikhAudioUrl: string, expectedDurationMs: number): Promise<void> {
+    this.clearTimer();
     this.targetDurationMs = expectedDurationMs;
     this.setState('sheikh_playing');
 
@@ -32,9 +34,9 @@ export class EchoController {
         await this.recorder.start();
 
         const timeout = Math.round(this.targetDurationMs * 1.25);
-        setTimeout(async () => {
+        this.echoTimeoutId = setTimeout(() => {
           if (this.state === 'child_echo') {
-            await this.finishEcho();
+            void this.finishEcho();
           }
         }, Math.max(3000, timeout));
       }
@@ -44,6 +46,7 @@ export class EchoController {
   }
 
   async finishEcho(): Promise<void> {
+    this.clearTimer();
     this.setState('evaluating');
     await this.recorder.stop();
     const actualMs = Date.now() - this.startTime;
@@ -58,13 +61,21 @@ export class EchoController {
   }
 
   stop(): void {
+    this.clearTimer();
     this.player.stop();
-    this.recorder.stop();
+    void this.recorder.stop();
     this.setState('idle');
+  }
+
+  private clearTimer(): void {
+    if (this.echoTimeoutId !== null) {
+      clearTimeout(this.echoTimeoutId);
+      this.echoTimeoutId = null;
+    }
   }
 
   private setState(newState: EchoState, score?: number): void {
     this.state = newState;
-    if (this.listener) this.listener(newState, score);
+    this.listener?.(newState, score);
   }
 }

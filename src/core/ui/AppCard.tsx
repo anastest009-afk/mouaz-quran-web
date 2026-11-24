@@ -1,10 +1,12 @@
 import React from 'react';
+import { motion } from 'motion/react';
 
 export interface AppCardProps {
   children: React.ReactNode;
   onClick?: () => void;
   borderColor?: string;
   active?: boolean;
+  hasError?: boolean;
 }
 
 export const AppCard: React.FC<AppCardProps> = ({
@@ -12,25 +14,39 @@ export const AppCard: React.FC<AppCardProps> = ({
   onClick,
   borderColor,
   active = false,
+  hasError = false,
 }) => {
-  const resolvedBorder = borderColor || (active ? 'var(--color-brand-primary)' : 'var(--color-surface-interactive)');
+  const resolvedBorder = hasError
+    ? 'var(--color-feedback-alert)'
+    : borderColor ||
+      (active ? 'var(--color-brand-primary)' : 'var(--color-surface-interactive)');
+
+  const resolvedBackground = hasError
+    ? 'var(--color-alert-tint)'
+    : active
+      ? 'var(--color-surface-primary)'
+      : 'var(--color-surface-primary)';
 
   return (
-    <div
+    <motion.div
       onClick={onClick}
+      animate={hasError ? { x: [0, -7, 7, -5, 5, 0] } : { x: 0 }}
+      transition={hasError ? { duration: 0.36 } : { type: 'spring', stiffness: 360, damping: 28 }}
+      whileHover={onClick ? { y: -2 } : undefined}
+      whileTap={onClick ? { scale: 0.99 } : undefined}
       style={{
-        backgroundColor: 'var(--color-surface-primary)',
+        backgroundColor: resolvedBackground,
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--spacing-md)',
-        border: `2.5px solid ${resolvedBorder}`,
-        transition: 'border-color 0.2s ease, transform 0.15s ease',
+        border: `2px solid ${resolvedBorder}`,
+        transition: 'border-color 0.2s ease, background-color 0.2s ease',
         cursor: onClick ? 'pointer' : 'default',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+        boxShadow: active
+          ? '0 6px 18px var(--color-shadow-elevated)'
+          : '0 2px 10px var(--color-shadow-card)',
       }}
-      onMouseEnter={(e) => onClick && (e.currentTarget.style.transform = 'translateY(-2px)')}
-      onMouseLeave={(e) => onClick && (e.currentTarget.style.transform = 'translateY(0)')}
     >
       {children}
-    </div>
+    </motion.div>
   );
 };

@@ -1,11 +1,12 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { LucideIcon } from 'lucide-react';
 
 export interface AppButtonProps {
   label: string;
   icon?: LucideIcon;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'recording' | 'success';
+  variant?: 'primary' | 'secondary' | 'recording' | 'success' | 'subtle';
   disabled?: boolean;
 }
 
@@ -18,17 +19,30 @@ export const AppButton: React.FC<AppButtonProps> = ({
 }) => {
   const getBgColor = () => {
     switch (variant) {
-      case 'secondary': return 'var(--color-brand-secondary)';
-      case 'recording': return 'var(--color-mic-recording)';
-      case 'success': return 'var(--color-feedback-success)';
-      default: return 'var(--color-brand-primary)';
+      case 'secondary':
+        return 'var(--color-brand-secondary)';
+      case 'recording':
+        return 'var(--color-mic-recording)';
+      case 'success':
+        return 'var(--color-feedback-success)';
+      case 'subtle':
+        return 'var(--color-surface-subtle)';
+      default:
+        return 'var(--color-brand-primary)';
     }
   };
 
+  const getTextColor = () =>
+    variant === 'subtle' ? 'var(--color-text-primary)' : 'var(--color-text-inverse)';
+
   return (
-    <button
+    <motion.button
+      type="button"
       onClick={onClick}
       disabled={disabled}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
+      whileHover={disabled ? undefined : { y: -1 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -37,23 +51,20 @@ export const AppButton: React.FC<AppButtonProps> = ({
         minHeight: '48px',
         padding: '0 var(--spacing-lg)',
         backgroundColor: getBgColor(),
-        color: 'var(--color-text-inverse)',
-        border: 'none',
+        color: getTextColor(),
+        border: variant === 'subtle' ? '1.5px solid var(--color-surface-interactive)' : 'none',
         borderRadius: 'var(--radius-pill)',
         fontFamily: 'var(--font-general)',
-        fontSize: '1.1rem',
+        fontSize: '1rem',
         fontWeight: 700,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        transition: 'transform 0.15s ease, opacity 0.15s ease',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        opacity: disabled ? 0.55 : 1,
+        boxShadow: '0 4px 12px var(--color-shadow-card)',
         width: '100%',
       }}
-      onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = 'scale(0.97)')}
-      onMouseUp={(e) => !disabled && (e.currentTarget.style.transform = 'scale(1)')}
     >
-      {Icon && <Icon size={22} />}
+      {Icon && <Icon size={20} />}
       <span>{label}</span>
-    </button>
+    </motion.button>
   );
 };

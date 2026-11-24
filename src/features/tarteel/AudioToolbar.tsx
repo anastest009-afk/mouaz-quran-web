@@ -20,19 +20,22 @@ export const AudioToolbar: React.FC<AudioToolbarProps> = ({
     <div
       style={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 'var(--spacing-sm)',
         padding: 'var(--spacing-sm) var(--spacing-md)',
         backgroundColor: 'var(--color-surface-primary)',
         borderRadius: 'var(--radius-md)',
         border: '1.5px solid var(--color-surface-interactive)',
-        marginBottom: 'var(--spacing-md)',
+        marginBottom: 'var(--spacing-sm)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
         <UserCheck size={18} color="var(--color-brand-primary)" />
         <select
           value={activeReciterId}
+          aria-label={STRINGS.reciterLabel}
           onChange={(e) => onSelectReciter(e.target.value)}
           style={{
             border: 'none',
@@ -46,12 +49,22 @@ export const AudioToolbar: React.FC<AudioToolbarProps> = ({
           }}
         >
           {RECITERS.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
+            <option
+              key={r.id}
+              value={r.id}
+              style={{
+                backgroundColor: 'var(--color-surface-primary)',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              {r.name}
+            </option>
           ))}
         </select>
       </div>
 
       <button
+        type="button"
         onClick={onToggleRepeat}
         style={{
           display: 'flex',
@@ -63,11 +76,12 @@ export const AudioToolbar: React.FC<AudioToolbarProps> = ({
           padding: 'var(--spacing-xs) var(--spacing-md)',
           borderRadius: 'var(--radius-pill)',
           cursor: 'pointer',
+          fontFamily: 'var(--font-general)',
           fontWeight: 700,
           fontSize: '0.85rem',
         }}
       >
-        <Repeat size={16} />
+        <Repeat size={15} />
         <span>{STRINGS.btnRepeat}</span>
       </button>
     </div>

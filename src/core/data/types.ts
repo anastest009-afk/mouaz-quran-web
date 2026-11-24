@@ -9,6 +9,7 @@ export interface Ayah {
   surahNumber: number;
   ayahNumber: number;
   textUthmanic: string;
+  textSimple?: string;
   tafseerMuyassar: string;
   audioFileName: string;
 }
@@ -36,9 +37,11 @@ export interface Reciter {
   baseUrl: string;
 }
 
-export interface ChildProgress {
+export interface AyahProgress {
   surahNumber: number;
   ayahNumber: number;
   stars: number;
   isMastered: boolean;
 }
+
+export type ChildProgress = AyahProgress;

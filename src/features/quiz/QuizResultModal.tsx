@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Star } from 'lucide-react';
 import { AppModal } from '../../core/ui/AppModal';
@@ -22,7 +23,7 @@ export const QuizResultModal: React.FC<QuizResultModalProps> = ({
 }) => {
   useEffect(() => {
     if (isOpen && isCorrect) {
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+      confetti({ particleCount: 45, spread: 68, origin: { y: 0.62 } });
     }
   }, [isOpen, isCorrect]);
 
@@ -31,7 +32,7 @@ export const QuizResultModal: React.FC<QuizResultModalProps> = ({
       <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
         <h3
           style={{
-            fontSize: '1.5rem',
+            fontSize: '1.45rem',
             fontWeight: 800,
             color: isCorrect ? 'var(--color-feedback-success)' : 'var(--color-feedback-alert)',
           }}
@@ -39,23 +40,43 @@ export const QuizResultModal: React.FC<QuizResultModalProps> = ({
           {isCorrect ? STRINGS.feedbackSuccess : STRINGS.feedbackTryAgain}
         </h3>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--spacing-xs)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--spacing-sm)' }}>
           {[1, 2, 3].map((s) => (
-            <Star
+            <motion.div
               key={s}
-              size={40}
-              color={s <= stars ? 'var(--color-reward-gold)' : 'var(--color-surface-interactive)'}
-              fill={s <= stars ? 'var(--color-reward-gold)' : 'transparent'}
-            />
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: s * 0.08, type: 'spring', stiffness: 360, damping: 20 }}
+            >
+              <Star
+                size={38}
+                color={s <= stars ? 'var(--color-reward-gold)' : 'var(--color-surface-interactive)'}
+                fill={s <= stars ? 'var(--color-reward-gold)' : 'transparent'}
+              />
+            </motion.div>
           ))}
         </div>
 
         {!isCorrect && correctAnswerText && (
-          <div style={{ backgroundColor: 'var(--color-surface-subtle)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)' }}>
-            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface-subtle)',
+              padding: 'var(--spacing-md)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-surface-interactive)',
+            }}
+          >
+            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.88rem' }}>
               {STRINGS.correctAnswerWas}:
             </span>
-            <div style={{ fontWeight: 800, marginTop: 'var(--spacing-xs)', color: 'var(--color-brand-primary)' }}>
+            <div
+              style={{
+                fontWeight: 800,
+                marginTop: 'var(--spacing-xs)',
+                fontSize: '1.1rem',
+                color: 'var(--color-brand-primary)',
+              }}
+            >
               {correctAnswerText}
             </div>
           </div>

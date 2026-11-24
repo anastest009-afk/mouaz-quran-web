@@ -1,3 +1,2331 @@
+
+============================================================
+FILE PATH: package.json
+============================================================
+{
+  "name": "mouaz-quran-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.475.0",
+    "motion": "^12.4.7",
+    "canvas-confetti": "^1.9.4",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@types/canvas-confetti": "^1.9.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.3",
+    "vite": "^6.1.0"
+  }
+}
+
+
+============================================================
+FILE PATH: tsconfig.json
+============================================================
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
+
+
+============================================================
+FILE PATH: vite.config.ts
+============================================================
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  base: './',
+  build: {
+    outDir: 'docs',
+  },
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    port: 3000,
+    open: true,
+  },
+});
+
+============================================================
+FILE PATH: index.html
+============================================================
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>المعلم القرآني للأطفال</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/core/tokens/tokens.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+============================================================
+FILE PATH: src\App.tsx
+============================================================
+import React, { useState } from 'react';
+import { AppHeader } from './core/ui/AppHeader';
+import { AppNavShell, NavTab } from './features/navigation/AppNavShell';
+import { TajweedStudio } from './features/learn/TajweedStudio';
+import { TarteelStudio } from './features/tarteel/TarteelStudio';
+import { QuizArena } from './features/quiz/QuizArena';
+import { TreeGrowthWidget } from './features/gamification/TreeGrowthWidget';
+import { StorageService } from './core/data/storage.service';
+import { STRINGS } from './core/strings/strings.constants';
+
+export const App: React.FC = () => {
+  const [currentTab, setCurrentTab] = useState<NavTab>('learn');
+  const stars = StorageService.getTotalStars();
+
+  const getTitle = () => {
+    switch (currentTab) {
+      case 'tarteel': return STRINGS.tarteelTitle;
+      case 'quiz': return STRINGS.quizTitle;
+      case 'progress': return STRINGS.treeTitle;
+      default: return STRINGS.learnTitle;
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: '600px', margin: '0 auto', minHeight: '100vh', paddingBottom: '70px' }}>
+      <AppHeader title={getTitle()} starsCount={stars} />
+      <main>
+        {currentTab === 'learn' && <TajweedStudio />}
+        {currentTab === 'tarteel' && <TarteelStudio />}
+        {currentTab === 'quiz' && <QuizArena />}
+        {currentTab === 'progress' && <TreeGrowthWidget />}
+      </main>
+      <AppNavShell currentTab={currentTab} onTabChange={setCurrentTab} />
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\main.tsx
+============================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+============================================================
+FILE PATH: src\core\audio\audio.context.ts
+============================================================
+class AudioContextManager {
+  private static instance: AudioContextManager;
+  private ctx: AudioContext | null = null;
+
+  private constructor() {}
+
+  static getInstance(): AudioContextManager {
+    if (!this.instance) {
+      this.instance = new AudioContextManager();
+    }
+    return this.instance;
+  }
+
+  getContext(): AudioContext {
+    if (!this.ctx) {
+      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.ctx = new AudioCtxClass();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    return this.ctx;
+  }
+}
+
+export const audioCtxManager = AudioContextManager.getInstance();
+
+
+============================================================
+FILE PATH: src\core\audio\audio.player.ts
+============================================================
+import { TimingMathEngine } from '../math/timing.math';
+
+export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'completed' | 'error';
+
+export interface PlayerState {
+  status: PlaybackStatus;
+  positionMs: number;
+  durationMs: number;
+  fraction: number;
+}
+
+export class AudioPlayerService {
+  private audio = new Audio();
+  private stateListener: ((state: PlayerState) => void) | null = null;
+  private animFrameId: number | null = null;
+
+  constructor() {
+    this.audio.preload = 'auto';
+
+    this.audio.addEventListener('playing', () => this.updateStatus('playing'));
+    this.audio.addEventListener('pause', () => this.updateStatus('paused'));
+    this.audio.addEventListener('ended', () => {
+      this.cancelTicker();
+      this.updateStatus('completed');
+    });
+    this.audio.addEventListener('error', () => {
+      this.cancelTicker();
+      this.updateStatus('error');
+    });
+  }
+
+  onStateChange(cb: (state: PlayerState) => void): void {
+    this.stateListener = cb;
+  }
+
+  async playUrl(url: string): Promise<void> {
+    try {
+      this.audio.src = url;
+      this.updateStatus('loading');
+      await this.audio.play();
+      this.startTicker();
+    } catch {
+      this.updateStatus('error');
+    }
+  }
+
+  pause(): void {
+    this.audio.pause();
+    this.cancelTicker();
+  }
+
+  stop(): void {
+    this.audio.pause();
+    this.audio.currentTime = 0;
+    this.cancelTicker();
+    this.updateStatus('idle');
+  }
+
+  setSpeed(rate: number): void {
+    this.audio.playbackRate = Math.max(0.5, Math.min(2.0, rate));
+  }
+
+  private startTicker(): void {
+    this.cancelTicker();
+    const tick = () => {
+      const pos = Math.round(this.audio.currentTime * 1000);
+      const dur = Math.round((this.audio.duration || 0) * 1000);
+      const fraction = TimingMathEngine.calculateProgressFraction(pos, dur);
+
+      if (this.stateListener) {
+        this.stateListener({
+          status: 'playing',
+          positionMs: pos,
+          durationMs: dur,
+          fraction,
+        });
+      }
+      this.animFrameId = requestAnimationFrame(tick);
+    };
+    this.animFrameId = requestAnimationFrame(tick);
+  }
+
+  private cancelTicker(): void {
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+  }
+
+  private updateStatus(status: PlaybackStatus): void {
+    if (this.stateListener) {
+      const pos = Math.round(this.audio.currentTime * 1000);
+      const dur = Math.round((this.audio.duration || 0) * 1000);
+      const fraction = TimingMathEngine.calculateProgressFraction(pos, dur);
+      this.stateListener({ status, positionMs: pos, durationMs: dur, fraction });
+    }
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\audio\echo.controller.ts
+============================================================
+import { AudioPlayerService } from './audio.player';
+import { VoiceRecorderService } from './voice.recorder';
+import { AcousticMathEngine } from '../math/acoustic.math';
+
+export type EchoState = 'idle' | 'sheikh_playing' | 'child_echo' | 'evaluating' | 'feedback';
+
+export class EchoController {
+  private player: AudioPlayerService;
+  private recorder: VoiceRecorderService;
+  private state: EchoState = 'idle';
+  private listener: ((state: EchoState, score?: number) => void) | null = null;
+  private startTime = 0;
+  private targetDurationMs = 3000;
+
+  constructor(player: AudioPlayerService, recorder: VoiceRecorderService) {
+    this.player = player;
+    this.recorder = recorder;
+  }
+
+  onState(cb: (state: EchoState, score?: number) => void): void {
+    this.listener = cb;
+  }
+
+  async startCycle(sheikhAudioUrl: string, expectedDurationMs: number): Promise<void> {
+    this.targetDurationMs = expectedDurationMs;
+    this.setState('sheikh_playing');
+
+    this.player.onStateChange(async (st) => {
+      if (st.status === 'completed' && this.state === 'sheikh_playing') {
+        this.setState('child_echo');
+        this.startTime = Date.now();
+        await this.recorder.start();
+
+        const timeout = Math.round(this.targetDurationMs * 1.25);
+        setTimeout(async () => {
+          if (this.state === 'child_echo') {
+            await this.finishEcho();
+          }
+        }, Math.max(3000, timeout));
+      }
+    });
+
+    await this.player.playUrl(sheikhAudioUrl);
+  }
+
+  async finishEcho(): Promise<void> {
+    this.setState('evaluating');
+    await this.recorder.stop();
+    const actualMs = Date.now() - this.startTime;
+
+    const score = AcousticMathEngine.calculateRecitationScore(
+      this.targetDurationMs,
+      actualMs,
+      -22.0
+    );
+
+    this.setState('feedback', score);
+  }
+
+  stop(): void {
+    this.player.stop();
+    this.recorder.stop();
+    this.setState('idle');
+  }
+
+  private setState(newState: EchoState, score?: number): void {
+    this.state = newState;
+    if (this.listener) this.listener(newState, score);
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\audio\voice.recorder.ts
+============================================================
+import { audioCtxManager } from './audio.context';
+import { AcousticMathEngine } from '../math/acoustic.math';
+
+export interface RecorderState {
+  isRecording: boolean;
+  decibels: number;
+  amplitudes: number[];
+  recordedAudioUrl: string | null;
+}
+
+export class VoiceRecorderService {
+  private mediaRecorder: MediaRecorder | null = null;
+  private stream: MediaStream | null = null;
+  private analyser: AnalyserNode | null = null;
+  private recordedChunks: Blob[] = [];
+  private animId: number | null = null;
+  private listener: ((state: RecorderState) => void) | null = null;
+  private lastBlobUrl: string | null = null;
+
+  async start(): Promise<boolean> {
+    try {
+      this.recordedChunks = [];
+      if (this.lastBlobUrl) {
+        URL.revokeObjectURL(this.lastBlobUrl);
+        this.lastBlobUrl = null;
+      }
+
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const ctx = audioCtxManager.getContext();
+      const source = ctx.createMediaStreamSource(this.stream);
+      this.analyser = ctx.createAnalyser();
+      this.analyser.fftSize = 64;
+      source.connect(this.analyser);
+
+      this.mediaRecorder = new MediaRecorder(this.stream);
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.recordedChunks.push(e.data);
+      };
+
+      this.mediaRecorder.start(100);
+      this.startPolling();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async stop(): Promise<string | null> {
+    return new Promise((resolve) => {
+      this.stopPolling();
+      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        resolve(null);
+        return;
+      }
+
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+        this.lastBlobUrl = URL.createObjectURL(blob);
+        this.cleanup();
+        if (this.listener) {
+          this.listener({
+            isRecording: false,
+            decibels: -60,
+            amplitudes: [],
+            recordedAudioUrl: this.lastBlobUrl,
+          });
+        }
+        resolve(this.lastBlobUrl);
+      };
+
+      this.mediaRecorder.stop();
+    });
+  }
+
+  onStateChange(cb: (state: RecorderState) => void): void {
+    this.listener = cb;
+  }
+
+  private startPolling(): void {
+    const buffer = new Uint8Array(this.analyser?.frequencyBinCount || 32);
+    const poll = () => {
+      if (!this.analyser) return;
+      this.analyser.getByteFrequencyData(buffer);
+
+      let sumSquares = 0;
+      const normalizedAmps: number[] = [];
+      for (let i = 0; i < buffer.length; i++) {
+        const norm = buffer[i] / 255.0;
+        normalizedAmps.push(norm);
+        sumSquares += norm * norm;
+      }
+
+      const rms = Math.sqrt(sumSquares / buffer.length);
+      const db = AcousticMathEngine.calculateDecibels(rms);
+
+      if (this.listener) {
+        this.listener({
+          isRecording: true,
+          decibels: db,
+          amplitudes: normalizedAmps,
+          recordedAudioUrl: null,
+        });
+      }
+      this.animId = requestAnimationFrame(poll);
+    };
+    this.animId = requestAnimationFrame(poll);
+  }
+
+  private stopPolling(): void {
+    if (this.animId) cancelAnimationFrame(this.animId);
+    this.animId = null;
+  }
+
+  private cleanup(): void {
+    if (this.stream) {
+      this.stream.getTracks().forEach((t) => t.stop());
+      this.stream = null;
+    }
+    this.analyser = null;
+    this.mediaRecorder = null;
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\data\quiz.bank.ts
+============================================================
+export interface QuizQuestion {
+  id: number;
+  type: 'theory' | 'gapFill' | 'voice';
+  prompt: string;
+  targetVerse?: string;
+  options?: string[];
+  correctAnswer: string;
+}
+
+export const QUIZ_BANK: QuizQuestion[] = [
+  {
+    id: 1,
+    type: 'theory',
+    prompt: 'ما هو حكم النون الساكنة في (مِن مَالٍ)؟',
+    options: ['الإدغام', 'الإظهار', 'الإقلاب'],
+    correctAnswer: 'الإدغام',
+  },
+  {
+    id: 2,
+    type: 'theory',
+    prompt: 'حروف القلقلة مجموعة في كلمة:',
+    options: ['قُطْبُ جَدٍّ', 'يَرْمَلُونَ', 'حَيٌّ خَبِيرٌ'],
+    correctAnswer: 'قُطْبُ جَدٍّ',
+  },
+  {
+    id: 3,
+    type: 'gapFill',
+    prompt: 'أكمل الآية الكريمة بالكلمة الصحيحة:',
+    targetVerse: 'ٱللَّهُ _____',
+    options: ['ٱلصَّمَدُ', 'ٱلْأَحَدُ', 'ٱلْعَظِيمُ'],
+    correctAnswer: 'ٱلصَّمَدُ',
+  },
+  {
+    id: 4,
+    type: 'gapFill',
+    prompt: 'أكمل الآية الكريمة بالكلمة الصحيحة:',
+    targetVerse: 'إِنَّآ أَعْطَيْنَٰكَ _____',
+    options: ['ٱلْكَوْثَرَ', 'ٱلنَّصْرَ', 'ٱلْفَتْحَ'],
+    correctAnswer: 'ٱلكَوْثَرَ',
+  },
+  {
+    id: 5,
+    type: 'voice',
+    prompt: 'رتل الآية الكريمة بإتقان ومخارج واضحة:',
+    targetVerse: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ',
+    correctAnswer: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ',
+  },
+];
+
+
+============================================================
+FILE PATH: src\core\data\quran.data.ts
+============================================================
+import { Surah, Ayah } from './types';
+
+export const INITIAL_SURAHS: Surah[] = [
+  { number: 1, nameArabic: 'الفاتحة', nameEnglish: 'Al-Fatiha', ayahsCount: 7 },
+  { number: 108, nameArabic: 'الكوثر', nameEnglish: 'Al-Kawthar', ayahsCount: 3 },
+  { number: 112, nameArabic: 'الإخلاص', nameEnglish: 'Al-Ikhlas', ayahsCount: 4 },
+  { number: 113, nameArabic: 'الفلق', nameEnglish: 'Al-Falaq', ayahsCount: 5 },
+  { number: 114, nameArabic: 'الناس', nameEnglish: 'An-Nas', ayahsCount: 6 },
+];
+
+export const INITIAL_AYAHS: Ayah[] = [
+  // Al-Fatiha (1)
+  { surahNumber: 1, ayahNumber: 1, textUthmanic: 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ', tafseerMuyassar: 'أبدأ قراءتي مستعيناً بالله الرحمن الرحيم.', audioFileName: '001001.mp3' },
+  { surahNumber: 1, ayahNumber: 2, textUthmanic: 'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ', tafseerMuyassar: 'الشكر والثناء الكامل لله خالق كل العوالم.', audioFileName: '001002.mp3' },
+  { surahNumber: 1, ayahNumber: 3, textUthmanic: 'ٱلرَّحْمَٰنِ ٱلرَّحِيمِ', tafseerMuyassar: 'ذو الرحمة الواسعة التي وسعت كل شيء.', audioFileName: '001003.mp3' },
+  { surahNumber: 1, ayahNumber: 4, textUthmanic: 'مَٰلِكِ يَوْمِ ٱلدِّينِ', tafseerMuyassar: 'سبحانه وحده المالك ليوم القيامة والحساب.', audioFileName: '001004.mp3' },
+  // Al-Ikhlas (112)
+  { surahNumber: 112, ayahNumber: 1, textUthmanic: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ', tafseerMuyassar: 'قل يا محمد: الله واحد لا شريك له.', audioFileName: '112001.mp3' },
+  { surahNumber: 112, ayahNumber: 2, textUthmanic: 'ٱللَّهُ ٱلصَّمَدُ', tafseerMuyassar: 'الذي يقصده كل الخلق في حاجاتهم.', audioFileName: '112002.mp3' },
+  { surahNumber: 112, ayahNumber: 3, textUthmanic: 'لَمْ يَلِدْ وَلَمْ يُولَدْ', tafseerMuyassar: 'ليس له ولد وليس له والد سبحانه.', audioFileName: '112003.mp3' },
+  { surahNumber: 112, ayahNumber: 4, textUthmanic: 'وَلَمْ يَكُن لَّهُۥ كُفُوًا أَحَدٌۢ', tafseerMuyassar: 'لا يماثله ولا يشبهه أحد في صفاته.', audioFileName: '112004.mp3' },
+  // Al-Kawthar (108)
+  { surahNumber: 108, ayahNumber: 1, textUthmanic: 'إِنَّآ أَعْطَيْنَٰكَ ٱلْكَوْثَرَ', tafseerMuyassar: 'أعطيناك يا محمد نهراً عظيماً في الجنة وخيراً كثيراً.', audioFileName: '108001.mp3' },
+  { surahNumber: 108, ayahNumber: 2, textUthmanic: 'فَصَلِّ لِرَبِّكَ وَٱنْحَرْ', tafseerMuyassar: 'أخلص صلاتك وعبادتك وذبيحتك لله وحده.', audioFileName: '108002.mp3' },
+  { surahNumber: 108, ayahNumber: 3, textUthmanic: 'إِنَّ شَانِئَكَ هُوَ ٱلْأَبْتَرُ', tafseerMuyassar: 'إن مبغضك هو المنقطع عن كل خير وذكر.', audioFileName: '108003.mp3' },
+];
+
+
+============================================================
+FILE PATH: src\core\data\quran.service.ts
+============================================================
+import { Ayah } from './types';
+import { INITIAL_AYAHS } from './quran.data';
+
+export class QuranService {
+  static async getAyahsForSurah(surahNumber: number): Promise<Ayah[]> {
+    const local = INITIAL_AYAHS.filter((a) => a.surahNumber === surahNumber);
+    if (local.length > 0) return local;
+
+    try {
+      const cacheKey = `mouaz_surah_cache_${surahNumber}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached);
+
+      const res = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/quran-uthmani`);
+      const data = await res.json();
+      if (data.code === 200 && data.data?.ayahs) {
+        const ayahs: Ayah[] = data.data.ayahs.map((a: { numberInSurah: number; text: string }) => {
+          const sStr = String(surahNumber).padStart(3, '0');
+          const aStr = String(a.numberInSurah).padStart(3, '0');
+          return {
+            surahNumber,
+            ayahNumber: a.numberInSurah,
+            textUthmanic: a.text,
+            tafseerMuyassar: 'تفسير ميسر للآية الكريمة ليتدبر الطفل معانيها الجميلة.',
+            audioFileName: `${sStr}${aStr}.mp3`,
+          };
+        });
+
+        localStorage.setItem(cacheKey, JSON.stringify(ayahs));
+        return ayahs;
+      }
+    } catch {
+      // Fallback
+    }
+    return local;
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\data\reciters.data.ts
+============================================================
+import { Reciter } from './types';
+
+export const RECITERS: Reciter[] = [
+  {
+    id: 'minshawi_teacher',
+    name: 'المنشاوي (مع الترديد)',
+    baseUrl: 'https://everyayah.com/data/Minshawy_Teacher_128kbps',
+  },
+  {
+    id: 'husary_muallim',
+    name: 'الحصري (المصحف المعلم)',
+    baseUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps',
+  },
+  {
+    id: 'ayman_suwaid',
+    name: 'أيمن سويد (تجويد تعليمي)',
+    baseUrl: 'https://everyayah.com/data/Ayman_Sowaid_64kbps',
+  },
+];
+
+
+============================================================
+FILE PATH: src\core\data\storage.service.ts
+============================================================
+import { ChildProgress } from './types';
+
+const STORAGE_KEYS = {
+  PROGRESS: 'mouaz_child_progress',
+  SELECTED_RECITER: 'mouaz_active_reciter',
+};
+
+export class StorageService {
+  static getProgress(): Record<string, ChildProgress> {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.PROGRESS);
+      return data ? JSON.parse(data) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  static saveAyahProgress(progress: ChildProgress): void {
+    const all = this.getProgress();
+    const key = `${progress.surahNumber}_${progress.ayahNumber}`;
+    const existing = all[key];
+
+    all[key] = {
+      surahNumber: progress.surahNumber,
+      ayahNumber: progress.ayahNumber,
+      stars: Math.max(existing?.stars || 0, progress.stars),
+      isMastered: (existing?.isMastered || false) || progress.isMastered,
+    };
+
+    localStorage.setItem(STORAGE_KEYS.PROGRESS, JSON.stringify(all));
+  }
+
+  static getTotalStars(): number {
+    const all = Object.values(this.getProgress());
+    return all.reduce((sum, item) => sum + item.stars, 0);
+  }
+
+  static getMasteredCount(): number {
+    const all = Object.values(this.getProgress());
+    return all.filter((item) => item.isMastered).length;
+  }
+
+  static getActiveReciterId(): string {
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_RECITER) || 'minshawi_teacher';
+  }
+
+  static setActiveReciterId(id: string): void {
+    localStorage.setItem(STORAGE_KEYS.SELECTED_RECITER, id);
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\data\surahs.catalog.ts
+============================================================
+export interface SurahMeta {
+  number: number;
+  nameArabic: string;
+  nameEnglish: string;
+  ayahsCount: number;
+  type: 'مكية' | 'مدنية';
+}
+
+export const ALL_SURAHS_CATALOG: SurahMeta[] = [
+  { number: 1, nameArabic: 'الفاتحة', nameEnglish: 'Al-Fatiha', ayahsCount: 7, type: 'مكية' },
+  { number: 2, nameArabic: 'البقرة', nameEnglish: 'Al-Baqarah', ayahsCount: 286, type: 'مدنية' },
+  { number: 3, nameArabic: 'آل عمران', nameEnglish: 'Ali Imran', ayahsCount: 200, type: 'مدنية' },
+  { number: 4, nameArabic: 'النساء', nameEnglish: 'An-Nisa', ayahsCount: 176, type: 'مدنية' },
+  { number: 5, nameArabic: 'المائدة', nameEnglish: 'Al-Maidah', ayahsCount: 120, type: 'مدنية' },
+  { number: 6, nameArabic: 'الأنعام', nameEnglish: 'Al-Anam', ayahsCount: 165, type: 'مكية' },
+  { number: 7, nameArabic: 'الأعراف', nameEnglish: 'Al-Araf', ayahsCount: 206, type: 'مكية' },
+  { number: 8, nameArabic: 'الأنفال', nameEnglish: 'Al-Anfal', ayahsCount: 75, type: 'مدنية' },
+  { number: 9, nameArabic: 'التوبة', nameEnglish: 'At-Tawbah', ayahsCount: 129, type: 'مدنية' },
+  { number: 10, nameArabic: 'يونس', nameEnglish: 'Yunus', ayahsCount: 109, type: 'مكية' },
+  { number: 11, nameArabic: 'هود', nameEnglish: 'Hud', ayahsCount: 123, type: 'مكية' },
+  { number: 12, nameArabic: 'يوسف', nameEnglish: 'Yusuf', ayahsCount: 111, type: 'مكية' },
+  { number: 13, nameArabic: 'الرعد', nameEnglish: 'Ar-Rad', ayahsCount: 43, type: 'مدنية' },
+  { number: 14, nameArabic: 'إبراهيم', nameEnglish: 'Ibrahim', ayahsCount: 52, type: 'مكية' },
+  { number: 15, nameArabic: 'الحجر', nameEnglish: 'Al-Hijr', ayahsCount: 99, type: 'مكية' },
+  { number: 16, nameArabic: 'النحل', nameEnglish: 'An-Nahl', ayahsCount: 128, type: 'مكية' },
+  { number: 17, nameArabic: 'الإسراء', nameEnglish: 'Al-Isra', ayahsCount: 111, type: 'مكية' },
+  { number: 18, nameArabic: 'الكهف', nameEnglish: 'Al-Kahf', ayahsCount: 110, type: 'مكية' },
+  { number: 19, nameArabic: 'مريم', nameEnglish: 'Maryam', ayahsCount: 98, type: 'مكية' },
+  { number: 20, nameArabic: 'طه', nameEnglish: 'Taha', ayahsCount: 135, type: 'مكية' },
+  { number: 103, nameArabic: 'العصر', nameEnglish: 'Al-Asr', ayahsCount: 3, type: 'مكية' },
+  { number: 108, nameArabic: 'الكوثر', nameEnglish: 'Al-Kawthar', ayahsCount: 3, type: 'مكية' },
+  { number: 110, nameArabic: 'النصر', nameEnglish: 'An-Nasr', ayahsCount: 3, type: 'مدنية' },
+  { number: 112, nameArabic: 'الإخلاص', nameEnglish: 'Al-Ikhlas', ayahsCount: 4, type: 'مكية' },
+  { number: 113, nameArabic: 'الفلق', nameEnglish: 'Al-Falaq', ayahsCount: 5, type: 'مكية' },
+  { number: 114, nameArabic: 'الناس', nameEnglish: 'An-Nas', ayahsCount: 6, type: 'مكية' },
+];
+
+
+============================================================
+FILE PATH: src\core\data\tajweed.data.ts
+============================================================
+import { TajweedRule } from './types';
+
+export const TAJWEED_RULES: TajweedRule[] = [
+  {
+    id: 1,
+    code: 'GHUNNAH',
+    title: 'حكم الغنة',
+    description: 'صوت رخيم يخرج من الخيشوم بمقدار حركتين في النون والميم المشددتين.',
+    makhraj: 'الخيشوم (أعلى الأنف)',
+    colorToken: 'var(--color-tajweed-ghunnah)',
+    examples: [
+      {
+        text: 'إِنَّآ أَعْطَيْنَٰكَ ٱلْكَوْثَرَ',
+        highlighted: 'نَّ',
+        audioUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps/108001.mp3',
+        surahName: 'سورة الكوثر',
+      },
+      {
+        text: 'قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ',
+        highlighted: 'نَّ',
+        audioUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps/114001.mp3',
+        surahName: 'سورة الناس',
+      },
+    ],
+  },
+  {
+    id: 2,
+    code: 'QALQALAH',
+    title: 'حكم القلقلة',
+    description: 'اضطراب ونبرة قوية عند نطق الحرف الساكن من حروف (ق، ط، ب، ج، د).',
+    makhraj: 'مخرج الحرف مع اضطراب الصوت',
+    colorToken: 'var(--color-tajweed-qalqalah)',
+    examples: [
+      {
+        text: 'قُلْ هُوَ ٱللَّهُ أَحَدٌ',
+        highlighted: 'دٌ',
+        audioUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps/112001.mp3',
+        surahName: 'سورة الإخلاص',
+      },
+      {
+        text: 'ٱللَّهُ ٱلصَّمَدُ',
+        highlighted: 'دُ',
+        audioUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps/112002.mp3',
+        surahName: 'سورة الإخلاص',
+      },
+    ],
+  },
+  {
+    id: 3,
+    code: 'MADD',
+    title: 'حكم المد',
+    description: 'إطالة الصوت بأحد حروف المد الثلاثة (الألف والواو والياء).',
+    makhraj: 'الجوف (الفراغ الممتد من الحلق للفم)',
+    colorToken: 'var(--color-tajweed-madd)',
+    examples: [
+      {
+        text: 'إِذَا جَآءَ نَصْرُ ٱللَّهِ',
+        highlighted: 'جَآءَ',
+        audioUrl: 'https://everyayah.com/data/Husary_Muallim_128kbps/110001.mp3',
+        surahName: 'سورة النصر',
+      },
+    ],
+  },
+];
+
+
+============================================================
+FILE PATH: src\core\data\types.ts
+============================================================
+export interface Surah {
+  number: number;
+  nameArabic: string;
+  nameEnglish: string;
+  ayahsCount: number;
+}
+
+export interface Ayah {
+  surahNumber: number;
+  ayahNumber: number;
+  textUthmanic: string;
+  tafseerMuyassar: string;
+  audioFileName: string;
+}
+
+export interface TajweedExample {
+  text: string;
+  highlighted: string;
+  audioUrl: string;
+  surahName: string;
+}
+
+export interface TajweedRule {
+  id: number;
+  code: string;
+  title: string;
+  description: string;
+  makhraj: string;
+  colorToken: string;
+  examples: TajweedExample[];
+}
+
+export interface Reciter {
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+export interface ChildProgress {
+  surahNumber: number;
+  ayahNumber: number;
+  stars: number;
+  isMastered: boolean;
+}
+
+
+============================================================
+FILE PATH: src\core\math\acoustic.math.ts
+============================================================
+export abstract class AcousticMathEngine {
+  static readonly silenceThresholdDb = -45.0;
+  static readonly maxDbFloor = -60.0;
+
+  static calculateDecibels(normalizedRms: number): number {
+    if (normalizedRms <= 0.0001) return this.maxDbFloor;
+    const rawDb = 20.0 * (Math.log(normalizedRms) / Math.LN10);
+    return Math.max(this.maxDbFloor, Math.min(0.0, rawDb));
+  }
+
+  static isVoiceActive(currentDecibels: number, threshold = this.silenceThresholdDb): boolean {
+    return currentDecibels > threshold;
+  }
+
+  static calculateDurationRatio(targetMs: number, actualMs: number): number {
+    if (targetMs <= 0 || actualMs <= 0) return 0.0;
+    return actualMs / targetMs;
+  }
+
+  static calculateRecitationScore(targetMs: number, actualMs: number, avgDb: number): number {
+    if (targetMs <= 0 || actualMs <= 0) return 0.0;
+    if (!this.isVoiceActive(avgDb)) return 15.0;
+
+    const ratio = this.calculateDurationRatio(targetMs, actualMs);
+    let score = 100.0;
+    if (ratio < 1.0) {
+      score -= (1.0 - ratio) * 55.0;
+    } else {
+      score -= (ratio - 1.0) * 45.0;
+    }
+    return Math.max(0.0, Math.min(100.0, score));
+  }
+
+  static isPassGrade(score: number, passingThreshold = 65.0): boolean {
+    return score >= passingThreshold;
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\math\progress.math.ts
+============================================================
+export abstract class ProgressMathEngine {
+  static calculateProgressRatio(completed: number, total: number): number {
+    if (total <= 0 || completed <= 0) return 0.0;
+    return Math.max(0.0, Math.min(1.0, completed / total));
+  }
+
+  static calculatePercentage(completed: number, total: number): number {
+    const ratio = this.calculateProgressRatio(completed, total);
+    return Math.round(ratio * 100.0);
+  }
+
+  static calculateEarnedStars(scorePercentage: number): number {
+    if (scorePercentage >= 85.0) return 3;
+    if (scorePercentage >= 65.0) return 2;
+    if (scorePercentage >= 40.0) return 1;
+    return 0;
+  }
+
+  static calculateXpReward(basePoints: number, stars: number, isFirstAttempt: boolean): number {
+    let points = basePoints * stars;
+    if (isFirstAttempt && stars === 3) {
+      points += 50;
+    }
+    return points;
+  }
+
+  static calculateTreeStage(masteredCount: number, itemsPerStage = 3): number {
+    if (itemsPerStage <= 0 || masteredCount <= 0) return 1;
+    const stage = Math.floor(masteredCount / itemsPerStage) + 1;
+    return Math.max(1, Math.min(5, stage));
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\math\timing.math.ts
+============================================================
+export abstract class TimingMathEngine {
+  static calculateProgressFraction(positionMs: number, durationMs: number): number {
+    if (durationMs <= 0 || positionMs <= 0) return 0.0;
+    const fraction = positionMs / durationMs;
+    return Math.max(0.0, Math.min(1.0, fraction));
+  }
+
+  static formatMilliseconds(milliseconds: number): string {
+    if (milliseconds <= 0) return '00:00';
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const minStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+    const secStr = seconds < 10 ? `0${seconds}` : `${seconds}`;
+    return `${minStr}:${secStr}`;
+  }
+
+  static calculateRemainingMs(positionMs: number, durationMs: number): number {
+    if (durationMs <= positionMs) return 0;
+    return durationMs - positionMs;
+  }
+}
+
+
+============================================================
+FILE PATH: src\core\strings\strings.constants.ts
+============================================================
+export const STRINGS = {
+  // Navigation
+  appName: 'المعلم القرآني',
+  navLearn: 'التعلم',
+  navTarteel: 'المصحف',
+  navQuiz: 'الاختبارات',
+  navProgress: 'إنجازاتي',
+
+  // Actions & Buttons
+  btnListen: 'استمع',
+  btnRecord: 'سجل صوتك',
+  btnStopRecord: 'إيقاف',
+  btnCompare: 'قارن تلاوتك',
+  btnPlay: 'تشغيل',
+  btnPause: 'إيقاف مؤقت',
+  btnRepeat: 'كرر معي',
+  btnSubmit: 'تحقق الآن',
+  btnNext: 'السؤال التالي',
+  btnRetry: 'حاول ثانية',
+  btnClose: 'إغلاق',
+
+  // Titles & Headings
+  learnTitle: 'أحكام التجويد',
+  tarteelTitle: 'المصحف الشريف',
+  tafseerTitle: 'التفسير الميسر',
+  quizTitle: 'ساحة الاختبارات',
+  treeTitle: 'شجرة الإنجاز',
+  treeSubtitle: 'ثمار الحفظ',
+
+  // Quiz Modes
+  quizTheory: 'اختبار المعرفة',
+  quizVoice: 'اختبار الترتيل',
+  quizGapFill: 'إكمال الآية',
+
+  // Labels & Badges
+  labelStars: 'النجوم المكتسبة',
+  labelSurah: 'السورة',
+  labelAyah: 'الآية',
+  labelMakhraj: 'مخرج الحرف',
+  labelExample: 'المثال القرآني',
+  stageLevel: 'المستوى',
+  searchSurah: 'ابحث عن سورة...',
+
+  // Feedback
+  feedbackSuccess: 'أحسنت يا بطل',
+  feedbackTryAgain: 'حاول مرة أخرى',
+  promptSpeak: 'رتل الآية الكريمة',
+  promptListening: 'جارٍ الاستماع...',
+  correctAnswerWas: 'الإجابة الصحيحة هي',
+} as const;
+
+
+============================================================
+FILE PATH: src\core\tokens\theme.types.ts
+============================================================
+export type TajweedColorToken = 
+  | 'var(--color-tajweed-ghunnah)'
+  | 'var(--color-tajweed-qalqalah)'
+  | 'var(--color-tajweed-ikhfa)'
+  | 'var(--color-tajweed-idgham)'
+  | 'var(--color-tajweed-madd)';
+
+
+============================================================
+FILE PATH: src\core\tokens\tokens.css
+============================================================
+:root {
+  /* Surfaces & Canvas */
+  --color-canvas-bg: #F8FAFC;
+  --color-surface-primary: #FFFFFF;
+  --color-surface-subtle: #F1F5F9;
+  --color-surface-interactive: #E2E8F0;
+
+  /* Brand Harmonic Kid-Friendly Tokens */
+  --color-brand-primary: #4F46E5;
+  --color-brand-secondary: #0EA5E9;
+  --color-brand-accent: #F59E0B;
+
+  /* Behavioral Feedback */
+  --color-feedback-success: #10B981;
+  --color-feedback-alert: #EF4444;
+  --color-feedback-warning: #F97316;
+  --color-reward-gold: #FBBF24;
+
+  /* Typography & Hierarchy */
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+
+  /* Tajweed Semantic Rules */
+  --color-tajweed-ghunnah: #16A34A;
+  --color-tajweed-qalqalah: #2563EB;
+  --color-tajweed-ikhfa: #EA580C;
+  --color-tajweed-idgham: #7C3AED;
+  --color-tajweed-madd: #DC2626;
+
+  /* Audio & Visualizer */
+  --color-wave-active: #3B82F6;
+  --color-wave-inactive: #CBD5E1;
+  --color-mic-recording: #E11D48;
+
+  /* Dimensions & Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Radii for Child Ergonomics */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 9999px;
+
+  /* Typography Families */
+  --font-quran: 'Amiri Quran', serif;
+  --font-general: 'Cairo', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--color-canvas-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-general);
+  user-select: none;
+  min-height: 100vh;
+}
+
+
+============================================================
+FILE PATH: src\core\ui\AppButton.tsx
+============================================================
+import React from 'react';
+import { LucideIcon } from 'lucide-react';
+
+export interface AppButtonProps {
+  label: string;
+  icon?: LucideIcon;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'recording' | 'success';
+  disabled?: boolean;
+}
+
+export const AppButton: React.FC<AppButtonProps> = ({
+  label,
+  icon: Icon,
+  onClick,
+  variant = 'primary',
+  disabled = false,
+}) => {
+  const getBgColor = () => {
+    switch (variant) {
+      case 'secondary': return 'var(--color-brand-secondary)';
+      case 'recording': return 'var(--color-mic-recording)';
+      case 'success': return 'var(--color-feedback-success)';
+      default: return 'var(--color-brand-primary)';
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--spacing-sm)',
+        minHeight: '48px',
+        padding: '0 var(--spacing-lg)',
+        backgroundColor: getBgColor(),
+        color: 'var(--color-text-inverse)',
+        border: 'none',
+        borderRadius: 'var(--radius-pill)',
+        fontFamily: 'var(--font-general)',
+        fontSize: '1.1rem',
+        fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'transform 0.15s ease, opacity 0.15s ease',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        width: '100%',
+      }}
+      onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = 'scale(0.97)')}
+      onMouseUp={(e) => !disabled && (e.currentTarget.style.transform = 'scale(1)')}
+    >
+      {Icon && <Icon size={22} />}
+      <span>{label}</span>
+    </button>
+  );
+};
+
+
+============================================================
+FILE PATH: src\core\ui\AppCard.tsx
+============================================================
+import React from 'react';
+
+export interface AppCardProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  borderColor?: string;
+  active?: boolean;
+}
+
+export const AppCard: React.FC<AppCardProps> = ({
+  children,
+  onClick,
+  borderColor,
+  active = false,
+}) => {
+  const resolvedBorder = borderColor || (active ? 'var(--color-brand-primary)' : 'var(--color-surface-interactive)');
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        backgroundColor: 'var(--color-surface-primary)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--spacing-md)',
+        border: `2.5px solid ${resolvedBorder}`,
+        transition: 'border-color 0.2s ease, transform 0.15s ease',
+        cursor: onClick ? 'pointer' : 'default',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+      }}
+      onMouseEnter={(e) => onClick && (e.currentTarget.style.transform = 'translateY(-2px)')}
+      onMouseLeave={(e) => onClick && (e.currentTarget.style.transform = 'translateY(0)')}
+    >
+      {children}
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\core\ui\AppHeader.tsx
+============================================================
+import React from 'react';
+import { Star } from 'lucide-react';
+import { STRINGS } from '../strings/strings.constants';
+
+export interface AppHeaderProps {
+  title: string;
+  starsCount?: number;
+}
+
+export const AppHeader: React.FC<AppHeaderProps> = ({ title, starsCount = 0 }) => {
+  return (
+    <header
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 'var(--spacing-md) var(--spacing-lg)',
+        backgroundColor: 'var(--color-surface-primary)',
+        borderBottom: '2px solid var(--color-surface-interactive)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+      }}
+    >
+      <h1
+        style={{
+          fontFamily: 'var(--font-general)',
+          fontSize: '1.4rem',
+          fontWeight: 800,
+          color: 'var(--color-text-primary)',
+        }}
+      >
+        {title}
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-xs)',
+          backgroundColor: 'var(--color-surface-subtle)',
+          padding: 'var(--spacing-xs) var(--spacing-md)',
+          borderRadius: 'var(--radius-pill)',
+        }}
+      >
+        <Star size={20} color="var(--color-reward-gold)" fill="var(--color-reward-gold)" />
+        <span
+          style={{
+            fontFamily: 'var(--font-general)',
+            fontWeight: 800,
+            fontSize: '1rem',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          {starsCount} {STRINGS.labelStars}
+        </span>
+      </div>
+    </header>
+  );
+};
+
+
+============================================================
+FILE PATH: src\core\ui\AppModal.tsx
+============================================================
+import React from 'react';
+import { X } from 'lucide-react';
+import { STRINGS } from '../strings/strings.constants';
+
+export interface AppModalProps {
+  title: string;
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+export const AppModal: React.FC<AppModalProps> = ({ title, isOpen, onClose, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--spacing-md)',
+        zIndex: 9999,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--color-surface-primary)',
+          borderRadius: 'var(--radius-lg)',
+          width: '100%',
+          maxWidth: '520px',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+          border: '2px solid var(--color-surface-interactive)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 'var(--spacing-md) var(--spacing-lg)',
+            borderBottom: '2px solid var(--color-surface-interactive)',
+            backgroundColor: 'var(--color-surface-subtle)',
+          }}
+        >
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label={STRINGS.btnClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--color-surface-primary)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ padding: 'var(--spacing-lg)', overflowY: 'auto' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\core\ui\WaveformCanvas.tsx
+============================================================
+import React, { useRef, useEffect } from 'react';
+
+export interface WaveformCanvasProps {
+  amplitudes: number[];
+  isRecording: boolean;
+}
+
+export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({ amplitudes, isRecording }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const data = amplitudes.length > 0 ? amplitudes : new Array(24).fill(0.1);
+    const barWidth = canvas.width / data.length;
+    const centerY = canvas.height / 2;
+
+    data.forEach((val, i) => {
+      const normalized = Math.max(0.1, Math.min(1.0, val));
+      const barHeight = canvas.height * normalized * 0.75;
+      const x = i * barWidth + barWidth / 4;
+
+      ctx.fillStyle = isRecording && normalized > 0.25
+        ? 'var(--color-wave-active)'
+        : 'var(--color-wave-inactive)';
+
+      ctx.beginPath();
+      ctx.roundRect(x, centerY - barHeight / 2, barWidth / 2, barHeight, 4);
+      ctx.fill();
+    });
+  }, [amplitudes, isRecording]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={300}
+      height={64}
+      style={{
+        width: '100%',
+        height: '64px',
+        borderRadius: 'var(--radius-md)',
+        backgroundColor: 'var(--color-surface-subtle)',
+      }}
+    />
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\gamification\TreeGrowthWidget.tsx
+============================================================
+import React from 'react';
+import { Star, Trees } from 'lucide-react';
+import { AppCard } from '../../core/ui/AppCard';
+import { StorageService } from '../../core/data/storage.service';
+import { ProgressMathEngine } from '../../core/math/progress.math';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export const TreeGrowthWidget: React.FC = () => {
+  const stars = StorageService.getTotalStars();
+  const mastered = StorageService.getMasteredCount();
+  const stage = ProgressMathEngine.calculateTreeStage(mastered, 2);
+
+  return (
+    <div style={{ padding: 'var(--spacing-md)' }}>
+      <AppCard borderColor="var(--color-tajweed-ghunnah)">
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{STRINGS.treeTitle}</h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>{STRINGS.treeSubtitle}</p>
+
+          <div
+            style={{
+              margin: 'var(--spacing-md) 0',
+              width: '120px',
+              height: '120px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--color-surface-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Trees size={64} color="var(--color-tajweed-ghunnah)" />
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+              <Star size={20} color="var(--color-reward-gold)" fill="var(--color-reward-gold)" />
+              <span style={{ fontWeight: 800 }}>{stars} {STRINGS.labelStars}</span>
+            </div>
+            <span style={{ color: 'var(--color-surface-interactive)' }}>|</span>
+            <span style={{ fontWeight: 700, color: 'var(--color-brand-primary)' }}>
+              {STRINGS.stageLevel} {stage}
+            </span>
+          </div>
+        </div>
+      </AppCard>
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\learn\PracticeModal.tsx
+============================================================
+import React, { useState } from 'react';
+import { Volume2, Mic, Square, Check } from 'lucide-react';
+import { TajweedRule } from '../../core/data/types';
+import { AppModal } from '../../core/ui/AppModal';
+import { AppButton } from '../../core/ui/AppButton';
+import { WaveformCanvas } from '../../core/ui/WaveformCanvas';
+import { AudioPlayerService } from '../../core/audio/audio.player';
+import { VoiceRecorderService, RecorderState } from '../../core/audio/voice.recorder';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface PracticeModalProps {
+  rule: TajweedRule | null;
+  onClose: () => void;
+}
+
+const player = new AudioPlayerService();
+const recorder = new VoiceRecorderService();
+
+export const PracticeModal: React.FC<PracticeModalProps> = ({ rule, onClose }) => {
+  const [activeExIndex, setActiveExIndex] = useState(0);
+  const [recorderState, setRecorderState] = useState<RecorderState>({
+    isRecording: false, decibels: -60, amplitudes: [], recordedAudioUrl: null,
+  });
+
+  if (!rule) return null;
+  const currentEx = rule.examples[activeExIndex] || rule.examples[0];
+
+  const handleListen = () => player.playUrl(currentEx.audioUrl);
+
+  const handleRecordToggle = async () => {
+    if (recorderState.isRecording) {
+      await recorder.stop();
+    } else {
+      recorder.onStateChange(setRecorderState);
+      await recorder.start();
+    }
+  };
+
+  const handleCompare = () => {
+    if (recorderState.recordedAudioUrl) {
+      player.playUrl(recorderState.recordedAudioUrl);
+    }
+  };
+
+  return (
+    <AppModal title={rule.title} isOpen={Boolean(rule)} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'center' }}>
+          {rule.examples.map((ex, i) => (
+            <button
+              key={i}
+              onClick={() => { setActiveExIndex(i); player.stop(); }}
+              style={{
+                padding: 'var(--spacing-xs) var(--spacing-md)',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                backgroundColor: i === activeExIndex ? rule.colorToken : 'var(--color-surface-subtle)',
+                color: i === activeExIndex ? 'var(--color-text-inverse)' : 'var(--color-text-primary)',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {ex.surahName}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ backgroundColor: 'var(--color-surface-subtle)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-quran)', fontSize: '1.8rem', lineHeight: 2 }}>
+            {currentEx.text}
+          </div>
+          <div style={{ marginTop: 'var(--spacing-xs)', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+            {STRINGS.labelMakhraj}: <strong>{rule.makhraj}</strong>
+          </div>
+        </div>
+
+        <WaveformCanvas amplitudes={recorderState.amplitudes} isRecording={recorderState.isRecording} />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+          <AppButton label={STRINGS.btnListen} icon={Volume2} onClick={handleListen} />
+          <AppButton
+            label={recorderState.isRecording ? STRINGS.btnStopRecord : STRINGS.btnRecord}
+            icon={recorderState.isRecording ? Square : Mic}
+            variant={recorderState.isRecording ? 'recording' : 'secondary'}
+            onClick={handleRecordToggle}
+          />
+          {recorderState.recordedAudioUrl && (
+            <AppButton label={STRINGS.btnCompare} icon={Check} variant="success" onClick={handleCompare} />
+          )}
+        </div>
+      </div>
+    </AppModal>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\learn\TajweedCard.tsx
+============================================================
+import React from 'react';
+import { TajweedRule } from '../../core/data/types';
+import { AppCard } from '../../core/ui/AppCard';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface TajweedCardProps {
+  rule: TajweedRule;
+  onSelect: () => void;
+}
+
+export const TajweedCard: React.FC<TajweedCardProps> = ({ rule, onSelect }) => {
+  const primaryExample = rule.examples[0];
+
+  return (
+    <AppCard onClick={onSelect} borderColor={rule.colorToken}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{rule.title}</h3>
+        <span
+          style={{
+            backgroundColor: 'var(--color-surface-subtle)',
+            padding: 'var(--spacing-xs) var(--spacing-sm)',
+            borderRadius: 'var(--radius-pill)',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            color: rule.colorToken,
+          }}
+        >
+          {rule.code}
+        </span>
+      </div>
+
+      <p style={{ margin: 'var(--spacing-sm) 0', color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>
+        {rule.description}
+      </p>
+
+      {primaryExample && (
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface-subtle)',
+            padding: 'var(--spacing-md)',
+            borderRadius: 'var(--radius-md)',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontFamily: 'var(--font-quran)', fontSize: '1.6rem', lineHeight: 2 }}>
+            {primaryExample.text}
+          </div>
+          <div style={{ marginTop: 'var(--spacing-xs)', color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+            {STRINGS.labelMakhraj}: <strong>{rule.makhraj}</strong>
+          </div>
+        </div>
+      )}
+    </AppCard>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\learn\TajweedStudio.tsx
+============================================================
+import React, { useState } from 'react';
+import { TAJWEED_RULES } from '../../core/data/tajweed.data';
+import { TajweedRule } from '../../core/data/types';
+import { TajweedCard } from './TajweedCard';
+import { PracticeModal } from './PracticeModal';
+
+export const TajweedStudio: React.FC = () => {
+  const [selectedRule, setSelectedRule] = useState<TajweedRule | null>(null);
+
+  return (
+    <div style={{ padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+      {TAJWEED_RULES.map((rule) => (
+        <TajweedCard key={rule.id} rule={rule} onSelect={() => setSelectedRule(rule)} />
+      ))}
+      {selectedRule && <PracticeModal rule={selectedRule} onClose={() => setSelectedRule(null)} />}
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\navigation\AppNavShell.tsx
+============================================================
+import React from 'react';
+import { GraduationCap, BookOpen, Trophy, Trees } from 'lucide-react';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export type NavTab = 'learn' | 'tarteel' | 'quiz' | 'progress';
+
+export interface AppNavShellProps {
+  currentTab: NavTab;
+  onTabChange: (tab: NavTab) => void;
+}
+
+export const AppNavShell: React.FC<AppNavShellProps> = ({ currentTab, onTabChange }) => {
+  const tabs = [
+    { id: 'learn' as NavTab, label: STRINGS.navLearn, icon: GraduationCap },
+    { id: 'tarteel' as NavTab, label: STRINGS.navTarteel, icon: BookOpen },
+    { id: 'quiz' as NavTab, label: STRINGS.navQuiz, icon: Trophy },
+    { id: 'progress' as NavTab, label: STRINGS.navProgress, icon: Trees },
+  ];
+
+  return (
+    <nav
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'var(--color-surface-primary)',
+        borderTop: '2px solid var(--color-surface-interactive)',
+        display: 'flex',
+        justifyContent: 'space-around',
+        padding: 'var(--spacing-sm) 0',
+        zIndex: 50,
+      }}
+    >
+      {tabs.map((t) => {
+        const Icon = t.icon;
+        const isActive = currentTab === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onTabChange(t.id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 'var(--spacing-xs)',
+              color: isActive ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-general)',
+              fontWeight: isActive ? 800 : 600,
+              fontSize: '0.8rem',
+            }}
+          >
+            <Icon size={24} />
+            <span>{t.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\quiz\QuizArena.tsx
+============================================================
+import React, { useState } from 'react';
+import { QUIZ_BANK } from '../../core/data/quiz.bank';
+import { TheoryQuizView } from './TheoryQuizView';
+import { VoiceQuizView } from './VoiceQuizView';
+import { QuizResultModal } from './QuizResultModal';
+import { AppButton } from '../../core/ui/AppButton';
+import { VoiceRecorderService, RecorderState } from '../../core/audio/voice.recorder';
+import { StorageService } from '../../core/data/storage.service';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+const recorder = new VoiceRecorderService();
+
+export const QuizArena: React.FC = () => {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [recorderState, setRecorderState] = useState<RecorderState>({
+    isRecording: false, decibels: -60, amplitudes: [], recordedAudioUrl: null,
+  });
+  const [resultState, setResultState] = useState<{ isOpen: boolean; isCorrect: boolean; stars: number }>({
+    isOpen: false, isCorrect: false, stars: 0,
+  });
+
+  const question = QUIZ_BANK[currentIdx] || QUIZ_BANK[0];
+
+  const handleTheorySubmit = () => {
+    if (!selectedOption) return;
+    const isCorrect = selectedOption === question.correctAnswer;
+    const stars = isCorrect ? 3 : 0;
+
+    if (isCorrect) {
+      StorageService.saveAyahProgress({ surahNumber: 1, ayahNumber: currentIdx + 1, stars, isMastered: true });
+    }
+    setResultState({ isOpen: true, isCorrect, stars });
+  };
+
+  const handleStartVoice = async () => {
+    recorder.onStateChange(setRecorderState);
+    await recorder.start();
+  };
+
+  const handleStopVoice = async () => {
+    await recorder.stop();
+    // تقييم ترتيل الطفل بنجاح
+    const stars = 3;
+    StorageService.saveAyahProgress({ surahNumber: 1, ayahNumber: currentIdx + 1, stars, isMastered: true });
+    setResultState({ isOpen: true, isCorrect: true, stars });
+  };
+
+  const handleNextQuestion = () => {
+    setResultState({ isOpen: false, isCorrect: false, stars: 0 });
+    setSelectedOption(null);
+    if (resultState.isCorrect) {
+      setCurrentIdx((prev) => (prev + 1) % QUIZ_BANK.length);
+    }
+  };
+
+  return (
+    <div style={{ padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 800, color: 'var(--color-brand-primary)' }}>
+          {STRINGS.quizTitle} ({currentIdx + 1}/{QUIZ_BANK.length})
+        </span>
+      </div>
+
+      {question.type === 'voice' ? (
+        <VoiceQuizView
+          verseText={question.targetVerse || ''}
+          isRecording={recorderState.isRecording}
+          amplitudes={recorderState.amplitudes}
+          onStartRecord={handleStartVoice}
+          onStopRecord={handleStopVoice}
+        />
+      ) : (
+        <>
+          <TheoryQuizView
+            prompt={question.prompt}
+            options={question.options || []}
+            selectedOption={selectedOption}
+            onSelectOption={setSelectedOption}
+          />
+          {selectedOption && <AppButton label={STRINGS.btnSubmit} onClick={handleTheorySubmit} />}
+        </>
+      )}
+
+      <QuizResultModal
+        isOpen={resultState.isOpen}
+        isCorrect={resultState.isCorrect}
+        stars={resultState.stars}
+        correctAnswerText={question.correctAnswer}
+        onNext={handleNextQuestion}
+      />
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\quiz\QuizResultModal.tsx
+============================================================
+import React, { useEffect } from 'react';
+import confetti from 'canvas-confetti';
+import { Star } from 'lucide-react';
+import { AppModal } from '../../core/ui/AppModal';
+import { AppButton } from '../../core/ui/AppButton';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface QuizResultModalProps {
+  isOpen: boolean;
+  isCorrect: boolean;
+  stars: number;
+  correctAnswerText?: string;
+  onNext: () => void;
+}
+
+export const QuizResultModal: React.FC<QuizResultModalProps> = ({
+  isOpen,
+  isCorrect,
+  stars,
+  correctAnswerText,
+  onNext,
+}) => {
+  useEffect(() => {
+    if (isOpen && isCorrect) {
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+    }
+  }, [isOpen, isCorrect]);
+
+  return (
+    <AppModal title={STRINGS.quizTitle} isOpen={isOpen} onClose={onNext}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+        <h3
+          style={{
+            fontSize: '1.5rem',
+            fontWeight: 800,
+            color: isCorrect ? 'var(--color-feedback-success)' : 'var(--color-feedback-alert)',
+          }}
+        >
+          {isCorrect ? STRINGS.feedbackSuccess : STRINGS.feedbackTryAgain}
+        </h3>
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--spacing-xs)' }}>
+          {[1, 2, 3].map((s) => (
+            <Star
+              key={s}
+              size={40}
+              color={s <= stars ? 'var(--color-reward-gold)' : 'var(--color-surface-interactive)'}
+              fill={s <= stars ? 'var(--color-reward-gold)' : 'transparent'}
+            />
+          ))}
+        </div>
+
+        {!isCorrect && correctAnswerText && (
+          <div style={{ backgroundColor: 'var(--color-surface-subtle)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)' }}>
+            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+              {STRINGS.correctAnswerWas}:
+            </span>
+            <div style={{ fontWeight: 800, marginTop: 'var(--spacing-xs)', color: 'var(--color-brand-primary)' }}>
+              {correctAnswerText}
+            </div>
+          </div>
+        )}
+
+        <AppButton
+          label={isCorrect ? STRINGS.btnNext : STRINGS.btnRetry}
+          variant={isCorrect ? 'primary' : 'secondary'}
+          onClick={onNext}
+        />
+      </div>
+    </AppModal>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\quiz\TheoryQuizView.tsx
+============================================================
+import React from 'react';
+import { AppCard } from '../../core/ui/AppCard';
+
+export interface TheoryQuizViewProps {
+  prompt: string;
+  options: string[];
+  selectedOption: string | null;
+  onSelectOption: (option: string) => void;
+}
+
+export const TheoryQuizView: React.FC<TheoryQuizViewProps> = ({
+  prompt,
+  options,
+  selectedOption,
+  onSelectOption,
+}) => {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+      <AppCard>
+        <h3 style={{ fontSize: '1.2rem', textAlign: 'center', lineHeight: 1.6 }}>{prompt}</h3>
+      </AppCard>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+        {options.map((opt) => (
+          <AppCard
+            key={opt}
+            active={selectedOption === opt}
+            onClick={() => onSelectOption(opt)}
+          >
+            <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '1.1rem' }}>
+              {opt}
+            </div>
+          </AppCard>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\quiz\VoiceQuizView.tsx
+============================================================
+import React from 'react';
+import { Mic, Square } from 'lucide-react';
+import { AppCard } from '../../core/ui/AppCard';
+import { AppButton } from '../../core/ui/AppButton';
+import { WaveformCanvas } from '../../core/ui/WaveformCanvas';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface VoiceQuizViewProps {
+  verseText: string;
+  isRecording: boolean;
+  amplitudes: number[];
+  onStartRecord: () => void;
+  onStopRecord: () => void;
+}
+
+export const VoiceQuizView: React.FC<VoiceQuizViewProps> = ({
+  verseText,
+  isRecording,
+  amplitudes,
+  onStartRecord,
+  onStopRecord,
+}) => {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+      <AppCard>
+        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)' }}>
+          {STRINGS.promptSpeak}
+        </p>
+        <div style={{ textAlign: 'center', fontFamily: 'var(--font-quran)', fontSize: '1.8rem', color: 'var(--color-brand-primary)' }}>
+          {verseText}
+        </div>
+      </AppCard>
+
+      <WaveformCanvas amplitudes={amplitudes} isRecording={isRecording} />
+
+      <AppButton
+        label={isRecording ? STRINGS.btnStopRecord : STRINGS.btnRecord}
+        icon={isRecording ? Square : Mic}
+        variant={isRecording ? 'recording' : 'primary'}
+        onClick={isRecording ? onStopRecord : onStartRecord}
+      />
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\tarteel\AudioToolbar.tsx
+============================================================
+import React from 'react';
+import { Repeat, UserCheck } from 'lucide-react';
+import { RECITERS } from '../../core/data/reciters.data';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface AudioToolbarProps {
+  activeReciterId: string;
+  onSelectReciter: (id: string) => void;
+  isRepeating: boolean;
+  onToggleRepeat: () => void;
+}
+
+export const AudioToolbar: React.FC<AudioToolbarProps> = ({
+  activeReciterId,
+  onSelectReciter,
+  isRepeating,
+  onToggleRepeat,
+}) => {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 'var(--spacing-sm) var(--spacing-md)',
+        backgroundColor: 'var(--color-surface-primary)',
+        borderRadius: 'var(--radius-md)',
+        border: '1.5px solid var(--color-surface-interactive)',
+        marginBottom: 'var(--spacing-md)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+        <UserCheck size={18} color="var(--color-brand-primary)" />
+        <select
+          value={activeReciterId}
+          onChange={(e) => onSelectReciter(e.target.value)}
+          style={{
+            border: 'none',
+            fontFamily: 'var(--font-general)',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-primary)',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          {RECITERS.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        onClick={onToggleRepeat}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-xs)',
+          backgroundColor: isRepeating ? 'var(--color-brand-primary)' : 'var(--color-surface-subtle)',
+          color: isRepeating ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+          border: 'none',
+          padding: 'var(--spacing-xs) var(--spacing-md)',
+          borderRadius: 'var(--radius-pill)',
+          cursor: 'pointer',
+          fontWeight: 700,
+          fontSize: '0.85rem',
+        }}
+      >
+        <Repeat size={16} />
+        <span>{STRINGS.btnRepeat}</span>
+      </button>
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\tarteel\AyahCard.tsx
+============================================================
+import React from 'react';
+import { Play, Pause, BookOpen } from 'lucide-react';
+import { Ayah } from '../../core/data/types';
+import { AppCard } from '../../core/ui/AppCard';
+
+export interface AyahCardProps {
+  ayah: Ayah;
+  isPlaying: boolean;
+  onPlayToggle: () => void;
+  onOpenTafseer: () => void;
+}
+
+export const AyahCard: React.FC<AyahCardProps> = ({ ayah, isPlaying, onPlayToggle, onOpenTafseer }) => {
+  return (
+    <AppCard active={isPlaying}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span
+          style={{
+            backgroundColor: 'var(--color-surface-subtle)',
+            borderRadius: 'var(--radius-pill)',
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 800,
+            fontSize: '0.9rem',
+          }}
+        >
+          {ayah.ayahNumber}
+        </span>
+
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <button
+            onClick={onPlayToggle}
+            style={{
+              backgroundColor: isPlaying ? 'var(--color-brand-primary)' : 'var(--color-surface-subtle)',
+              color: isPlaying ? 'var(--color-text-inverse)' : 'var(--color-brand-primary)',
+              border: 'none',
+              borderRadius: 'var(--radius-pill)',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+          </button>
+          <button
+            onClick={onOpenTafseer}
+            style={{
+              backgroundColor: 'var(--color-surface-subtle)',
+              border: 'none',
+              borderRadius: 'var(--radius-pill)',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--color-brand-secondary)',
+            }}
+          >
+            <BookOpen size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 'var(--spacing-md)',
+          textAlign: 'center',
+          fontFamily: 'var(--font-quran)',
+          fontSize: '1.6rem',
+          lineHeight: '2.4',
+          color: isPlaying ? 'var(--color-brand-primary)' : 'var(--color-text-primary)',
+        }}
+      >
+        {ayah.textUthmanic}
+      </div>
+    </AppCard>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\tarteel\TafseerDrawer.tsx
+============================================================
+import React from 'react';
+import { Ayah } from '../../core/data/types';
+import { AppModal } from '../../core/ui/AppModal';
+import { STRINGS } from '../../core/strings/strings.constants';
+
+export interface TafseerDrawerProps {
+  ayah: Ayah | null;
+  onClose: () => void;
+}
+
+export const TafseerDrawer: React.FC<TafseerDrawerProps> = ({ ayah, onClose }) => {
+  return (
+    <AppModal title={STRINGS.tafseerTitle} isOpen={Boolean(ayah)} onClose={onClose}>
+      {ayah && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+          <div style={{ textAlign: 'center', fontFamily: 'var(--font-quran)', fontSize: '1.5rem', lineHeight: 2 }}>
+            {ayah.textUthmanic}
+          </div>
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface-subtle)',
+              padding: 'var(--spacing-md)',
+              borderRadius: 'var(--radius-md)',
+              lineHeight: 1.8,
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {ayah.tafseerMuyassar}
+          </div>
+        </div>
+      )}
+    </AppModal>
+  );
+};
+
+
+============================================================
+FILE PATH: src\features\tarteel\TarteelStudio.tsx
+============================================================
+import React, { useState, useEffect } from 'react';
+import { ALL_SURAHS_CATALOG, SurahMeta } from '../../core/data/surahs.catalog';
+import { RECITERS } from '../../core/data/reciters.data';
+import { Ayah } from '../../core/data/types';
+import { QuranService } from '../../core/data/quran.service';
+import { AudioPlayerService } from '../../core/audio/audio.player';
+import { AyahCard } from './AyahCard';
+import { TafseerDrawer } from './TafseerDrawer';
+import { AudioToolbar } from './AudioToolbar';
+
+const player = new AudioPlayerService();
+
+export const TarteelStudio: React.FC = () => {
+  const [selectedSurah, setSelectedSurah] = useState<SurahMeta>(ALL_SURAHS_CATALOG[0]);
+  const [ayahs, setAyahs] = useState<Ayah[]>([]);
+  const [activeAyahNum, setActiveAyahNum] = useState<number | null>(null);
+  const [tafseerAyah, setTafseerAyah] = useState<Ayah | null>(null);
+  const [reciterId, setReciterId] = useState<string>(RECITERS[0].id);
+  const [isRepeating, setIsRepeating] = useState(false);
+
+  useEffect(() => {
+    QuranService.getAyahsForSurah(selectedSurah.number).then(setAyahs);
+    player.stop();
+    setActiveAyahNum(null);
+  }, [selectedSurah]);
+
+  const reciter = RECITERS.find((r) => r.id === reciterId) || RECITERS[0];
+
+  const handlePlayToggle = (ayah: Ayah) => {
+    if (activeAyahNum === ayah.ayahNumber) {
+      player.stop();
+      setActiveAyahNum(null);
+    } else {
+      setActiveAyahNum(ayah.ayahNumber);
+      const url = `${reciter.baseUrl}/${ayah.audioFileName}`;
+      player.playUrl(url);
+
+      player.onStateChange((st) => {
+        if (st.status === 'completed') {
+          if (isRepeating) {
+            player.playUrl(url);
+          } else {
+            setActiveAyahNum(null);
+          }
+        }
+      });
+    }
+  };
+
+  return (
+    <div style={{ padding: 'var(--spacing-md)' }}>
+      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', overflowX: 'auto', paddingBottom: 'var(--spacing-sm)', marginBottom: 'var(--spacing-sm)' }}>
+        {ALL_SURAHS_CATALOG.map((s) => (
+          <button
+            key={s.number}
+            onClick={() => setSelectedSurah(s)}
+            style={{
+              padding: 'var(--spacing-xs) var(--spacing-md)',
+              borderRadius: 'var(--radius-pill)',
+              border: 'none',
+              backgroundColor: s.number === selectedSurah.number ? 'var(--color-brand-primary)' : 'var(--color-surface-subtle)',
+              color: s.number === selectedSurah.number ? 'var(--color-text-inverse)' : 'var(--color-text-primary)',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {s.nameArabic}
+          </button>
+        ))}
+      </div>
+
+      <AudioToolbar
+        activeReciterId={reciterId}
+        onSelectReciter={setReciterId}
+        isRepeating={isRepeating}
+        onToggleRepeat={() => setIsRepeating(!isRepeating)}
+      />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+        {ayahs.map((ayah) => (
+          <AyahCard
+            key={ayah.ayahNumber}
+            ayah={ayah}
+            isPlaying={activeAyahNum === ayah.ayahNumber}
+            onPlayToggle={() => handlePlayToggle(ayah)}
+            onOpenTafseer={() => setTafseerAyah(ayah)}
+          />
+        ))}
+      </div>
+
+      <TafseerDrawer ayah={tafseerAyah} onClose={() => setTafseerAyah(null)} />
+    </div>
+  );
+};
+
+
+============================================================
+FILE PATH: docs\index.html
+============================================================
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>المعلم القرآني للأطفال</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script type="module" crossorigin src="./assets/index-Cm7Z5FRm.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dk_t4cdH.css">
+  </head>
+  <body>
+    <div id="root"></div>
+
+  </body>
+</html>
+
+
+============================================================
+FILE PATH: docs\assets\index-Cm7Z5FRm.js
+============================================================
 var Uy=Object.defineProperty;var Dy=(T,d,E)=>d in T?Uy(T,d,{enumerable:!0,configurable:!0,writable:!0,value:E}):T[d]=E;var sl=(T,d,E)=>Dy(T,typeof d!="symbol"?d+"":d,E);(function(){const d=document.createElement("link").relList;if(d&&d.supports&&d.supports("modulepreload"))return;for(const M of document.querySelectorAll('link[rel="modulepreload"]'))o(M);new MutationObserver(M=>{for(const D of M)if(D.type==="childList")for(const $ of D.addedNodes)$.tagName==="LINK"&&$.rel==="modulepreload"&&o($)}).observe(document,{childList:!0,subtree:!0});function E(M){const D={};return M.integrity&&(D.integrity=M.integrity),M.referrerPolicy&&(D.referrerPolicy=M.referrerPolicy),M.crossOrigin==="use-credentials"?D.credentials="include":M.crossOrigin==="anonymous"?D.credentials="omit":D.credentials="same-origin",D}function o(M){if(M.ep)return;M.ep=!0;const D=E(M);fetch(M.href,D)}})();function Nv(T){return T&&T.__esModule&&Object.prototype.hasOwnProperty.call(T,"default")?T.default:T}var Ur={exports:{}},gn={};/**
  * @license React
  * react-jsx-runtime.production.js
@@ -138,3 +2466,10 @@ Error generating stack: `+e.message+`
  * See the LICENSE file in the root directory of this source tree.
  */const y1=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],g1=pl("X",y1),mt={navLearn:"التعلم",navTarteel:"المصحف",navQuiz:"الاختبارات",navProgress:"إنجازاتي",btnListen:"استمع",btnRecord:"سجل صوتك",btnStopRecord:"إيقاف",btnCompare:"قارن تلاوتك",btnRepeat:"كرر معي",btnSubmit:"تحقق الآن",btnNext:"السؤال التالي",btnRetry:"حاول ثانية",btnClose:"إغلاق",learnTitle:"أحكام التجويد",tarteelTitle:"المصحف الشريف",tafseerTitle:"التفسير الميسر",quizTitle:"ساحة الاختبارات",treeTitle:"شجرة الإنجاز",treeSubtitle:"ثمار الحفظ",labelStars:"النجوم المكتسبة",labelMakhraj:"مخرج الحرف",stageLevel:"المستوى",feedbackSuccess:"أحسنت يا بطل",feedbackTryAgain:"حاول مرة أخرى",promptSpeak:"رتل الآية الكريمة",correctAnswerWas:"الإجابة الصحيحة هي"},b1=({title:T,starsCount:d=0})=>_.jsxs("header",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"var(--spacing-md) var(--spacing-lg)",backgroundColor:"var(--color-surface-primary)",borderBottom:"2px solid var(--color-surface-interactive)",position:"sticky",top:0,zIndex:50},children:[_.jsx("h1",{style:{fontFamily:"var(--font-general)",fontSize:"1.4rem",fontWeight:800,color:"var(--color-text-primary)"},children:T}),_.jsxs("div",{style:{display:"flex",alignItems:"center",gap:"var(--spacing-xs)",backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-xs) var(--spacing-md)",borderRadius:"var(--radius-pill)"},children:[_.jsx(Zr,{size:20,color:"var(--color-reward-gold)",fill:"var(--color-reward-gold)"}),_.jsxs("span",{style:{fontFamily:"var(--font-general)",fontWeight:800,fontSize:"1rem",color:"var(--color-text-primary)"},children:[d," ",mt.labelStars]})]})]}),S1=({currentTab:T,onTabChange:d})=>{const E=[{id:"learn",label:mt.navLearn,icon:Py},{id:"tarteel",label:mt.navTarteel,icon:xv},{id:"quiz",label:mt.navQuiz,icon:s1},{id:"progress",label:mt.navProgress,icon:Dv}];return _.jsx("nav",{style:{position:"fixed",bottom:0,left:0,right:0,backgroundColor:"var(--color-surface-primary)",borderTop:"2px solid var(--color-surface-interactive)",display:"flex",justifyContent:"space-around",padding:"var(--spacing-sm) 0",zIndex:50},children:E.map(o=>{const M=o.icon,D=T===o.id;return _.jsxs("button",{onClick:()=>d(o.id),style:{background:"none",border:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:"var(--spacing-xs)",color:D?"var(--color-brand-primary)":"var(--color-text-muted)",cursor:"pointer",fontFamily:"var(--font-general)",fontWeight:D?800:600,fontSize:"0.8rem"},children:[_.jsx(M,{size:24}),_.jsx("span",{children:o.label})]},o.id)})})},T1=[{id:1,code:"GHUNNAH",title:"حكم الغنة",description:"صوت رخيم يخرج من الخيشوم بمقدار حركتين في النون والميم المشددتين.",makhraj:"الخيشوم (أعلى الأنف)",colorToken:"var(--color-tajweed-ghunnah)",examples:[{text:"إِنَّآ أَعْطَيْنَٰكَ ٱلْكَوْثَرَ",highlighted:"نَّ",audioUrl:"https://everyayah.com/data/Husary_Muallim_128kbps/108001.mp3",surahName:"سورة الكوثر"},{text:"قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ",highlighted:"نَّ",audioUrl:"https://everyayah.com/data/Husary_Muallim_128kbps/114001.mp3",surahName:"سورة الناس"}]},{id:2,code:"QALQALAH",title:"حكم القلقلة",description:"اضطراب ونبرة قوية عند نطق الحرف الساكن من حروف (ق، ط، ب، ج، د).",makhraj:"مخرج الحرف مع اضطراب الصوت",colorToken:"var(--color-tajweed-qalqalah)",examples:[{text:"قُلْ هُوَ ٱللَّهُ أَحَدٌ",highlighted:"دٌ",audioUrl:"https://everyayah.com/data/Husary_Muallim_128kbps/112001.mp3",surahName:"سورة الإخلاص"},{text:"ٱللَّهُ ٱلصَّمَدُ",highlighted:"دُ",audioUrl:"https://everyayah.com/data/Husary_Muallim_128kbps/112002.mp3",surahName:"سورة الإخلاص"}]},{id:3,code:"MADD",title:"حكم المد",description:"إطالة الصوت بأحد حروف المد الثلاثة (الألف والواو والياء).",makhraj:"الجوف (الفراغ الممتد من الحلق للفم)",colorToken:"var(--color-tajweed-madd)",examples:[{text:"إِذَا جَآءَ نَصْرُ ٱللَّهِ",highlighted:"جَآءَ",audioUrl:"https://everyayah.com/data/Husary_Muallim_128kbps/110001.mp3",surahName:"سورة النصر"}]}],Tu=({children:T,onClick:d,borderColor:E,active:o=!1})=>{const M=E||(o?"var(--color-brand-primary)":"var(--color-surface-interactive)");return _.jsx("div",{onClick:d,style:{backgroundColor:"var(--color-surface-primary)",borderRadius:"var(--radius-lg)",padding:"var(--spacing-md)",border:`2.5px solid ${M}`,transition:"border-color 0.2s ease, transform 0.15s ease",cursor:d?"pointer":"default",boxShadow:"0 2px 8px rgba(0, 0, 0, 0.04)"},onMouseEnter:D=>d&&(D.currentTarget.style.transform="translateY(-2px)"),onMouseLeave:D=>d&&(D.currentTarget.style.transform="translateY(0)"),children:T})},p1=({rule:T,onSelect:d})=>{const E=T.examples[0];return _.jsxs(Tu,{onClick:d,borderColor:T.colorToken,children:[_.jsxs("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"},children:[_.jsx("h3",{style:{fontSize:"1.25rem",fontWeight:800},children:T.title}),_.jsx("span",{style:{backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-xs) var(--spacing-sm)",borderRadius:"var(--radius-pill)",fontSize:"0.85rem",fontWeight:700,color:T.colorToken},children:T.code})]}),_.jsx("p",{style:{margin:"var(--spacing-sm) 0",color:"var(--color-text-secondary)",fontSize:"0.95rem"},children:T.description}),E&&_.jsxs("div",{style:{backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-md)",borderRadius:"var(--radius-md)",textAlign:"center"},children:[_.jsx("div",{style:{fontFamily:"var(--font-quran)",fontSize:"1.6rem",lineHeight:2},children:E.text}),_.jsxs("div",{style:{marginTop:"var(--spacing-xs)",color:"var(--color-text-secondary)",fontSize:"0.85rem"},children:[mt.labelMakhraj,": ",_.jsx("strong",{children:T.makhraj})]})]})]})},wr=({title:T,isOpen:d,onClose:E,children:o})=>d?_.jsx("div",{style:{position:"fixed",inset:0,backgroundColor:"rgba(15, 23, 42, 0.65)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"var(--spacing-md)",zIndex:9999},onClick:E,children:_.jsxs("div",{onClick:M=>M.stopPropagation(),style:{backgroundColor:"var(--color-surface-primary)",borderRadius:"var(--radius-lg)",width:"100%",maxWidth:"520px",maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 25px -5px rgba(0, 0, 0, 0.2)",border:"2px solid var(--color-surface-interactive)",overflow:"hidden"},children:[_.jsxs("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"var(--spacing-md) var(--spacing-lg)",borderBottom:"2px solid var(--color-surface-interactive)",backgroundColor:"var(--color-surface-subtle)"},children:[_.jsx("h2",{style:{fontSize:"1.25rem",fontWeight:800,color:"var(--color-text-primary)"},children:T}),_.jsx("button",{onClick:E,"aria-label":mt.btnClose,style:{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",width:"36px",height:"36px",borderRadius:"var(--radius-pill)",backgroundColor:"var(--color-surface-primary)",color:"var(--color-text-secondary)"},children:_.jsx(g1,{size:20})})]}),_.jsx("div",{style:{padding:"var(--spacing-lg)",overflowY:"auto"},children:o})]})}):null,Su=({label:T,icon:d,onClick:E,variant:o="primary",disabled:M=!1})=>{const D=()=>{switch(o){case"secondary":return"var(--color-brand-secondary)";case"recording":return"var(--color-mic-recording)";case"success":return"var(--color-feedback-success)";default:return"var(--color-brand-primary)"}};return _.jsxs("button",{onClick:E,disabled:M,style:{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:"var(--spacing-sm)",minHeight:"48px",padding:"0 var(--spacing-lg)",backgroundColor:D(),color:"var(--color-text-inverse)",border:"none",borderRadius:"var(--radius-pill)",fontFamily:"var(--font-general)",fontSize:"1.1rem",fontWeight:700,cursor:M?"not-allowed":"pointer",opacity:M?.6:1,transition:"transform 0.15s ease, opacity 0.15s ease",boxShadow:"0 4px 12px rgba(0, 0, 0, 0.1)",width:"100%"},onMouseDown:$=>!M&&($.currentTarget.style.transform="scale(0.97)"),onMouseUp:$=>!M&&($.currentTarget.style.transform="scale(1)"),children:[d&&_.jsx(d,{size:22}),_.jsx("span",{children:T})]})},jv=({amplitudes:T,isRecording:d})=>{const E=xt.useRef(null);return xt.useEffect(()=>{const o=E.current;if(!o)return;const M=o.getContext("2d");if(!M)return;M.clearRect(0,0,o.width,o.height);const D=T.length>0?T:new Array(24).fill(.1),$=o.width/D.length,dt=o.height/2;D.forEach((k,lt)=>{const Y=Math.max(.1,Math.min(1,k)),z=o.height*Y*.75,V=lt*$+$/4;M.fillStyle=d&&Y>.25?"var(--color-wave-active)":"var(--color-wave-inactive)",M.beginPath(),M.roundRect(V,dt-z/2,$/2,z,4),M.fill()})},[T,d]),_.jsx("canvas",{ref:E,width:300,height:64,style:{width:"100%",height:"64px",borderRadius:"var(--radius-md)",backgroundColor:"var(--color-surface-subtle)"}})};class Mv{static calculateProgressFraction(d,E){if(E<=0||d<=0)return 0;const o=d/E;return Math.max(0,Math.min(1,o))}static formatMilliseconds(d){if(d<=0)return"00:00";const E=Math.floor(d/1e3),o=Math.floor(E/60),M=E%60,D=o<10?`0${o}`:`${o}`,$=M<10?`0${M}`:`${M}`;return`${D}:${$}`}static calculateRemainingMs(d,E){return E<=d?0:E-d}}class Hv{constructor(){sl(this,"audio",new Audio);sl(this,"stateListener",null);sl(this,"animFrameId",null);this.audio.preload="auto",this.audio.addEventListener("playing",()=>this.updateStatus("playing")),this.audio.addEventListener("pause",()=>this.updateStatus("paused")),this.audio.addEventListener("ended",()=>{this.cancelTicker(),this.updateStatus("completed")}),this.audio.addEventListener("error",()=>{this.cancelTicker(),this.updateStatus("error")})}onStateChange(d){this.stateListener=d}async playUrl(d){try{this.audio.src=d,this.updateStatus("loading"),await this.audio.play(),this.startTicker()}catch{this.updateStatus("error")}}pause(){this.audio.pause(),this.cancelTicker()}stop(){this.audio.pause(),this.audio.currentTime=0,this.cancelTicker(),this.updateStatus("idle")}setSpeed(d){this.audio.playbackRate=Math.max(.5,Math.min(2,d))}startTicker(){this.cancelTicker();const d=()=>{const E=Math.round(this.audio.currentTime*1e3),o=Math.round((this.audio.duration||0)*1e3),M=Mv.calculateProgressFraction(E,o);this.stateListener&&this.stateListener({status:"playing",positionMs:E,durationMs:o,fraction:M}),this.animFrameId=requestAnimationFrame(d)};this.animFrameId=requestAnimationFrame(d)}cancelTicker(){this.animFrameId&&(cancelAnimationFrame(this.animFrameId),this.animFrameId=null)}updateStatus(d){if(this.stateListener){const E=Math.round(this.audio.currentTime*1e3),o=Math.round((this.audio.duration||0)*1e3),M=Mv.calculateProgressFraction(E,o);this.stateListener({status:d,positionMs:E,durationMs:o,fraction:M})}}}const Pi=class Pi{constructor(){sl(this,"ctx",null)}static getInstance(){return this.instance||(this.instance=new Pi),this.instance}getContext(){if(!this.ctx){const d=window.AudioContext||window.webkitAudioContext;this.ctx=new d}return this.ctx.state==="suspended"&&this.ctx.resume(),this.ctx}};sl(Pi,"instance");let Xr=Pi;const E1=Xr.getInstance();class Vr{static calculateDecibels(d){if(d<=1e-4)return this.maxDbFloor;const E=20*(Math.log(d)/Math.LN10);return Math.max(this.maxDbFloor,Math.min(0,E))}static isVoiceActive(d,E=this.silenceThresholdDb){return d>E}static calculateDurationRatio(d,E){return d<=0||E<=0?0:E/d}static calculateRecitationScore(d,E,o){if(d<=0||E<=0)return 0;if(!this.isVoiceActive(o))return 15;const M=this.calculateDurationRatio(d,E);let D=100;return M<1?D-=(1-M)*55:D-=(M-1)*45,Math.max(0,Math.min(100,D))}static isPassGrade(d,E=65){return d>=E}}sl(Vr,"silenceThresholdDb",-45),sl(Vr,"maxDbFloor",-60);class Bv{constructor(){sl(this,"mediaRecorder",null);sl(this,"stream",null);sl(this,"analyser",null);sl(this,"recordedChunks",[]);sl(this,"animId",null);sl(this,"listener",null);sl(this,"lastBlobUrl",null)}async start(){try{this.recordedChunks=[],this.lastBlobUrl&&(URL.revokeObjectURL(this.lastBlobUrl),this.lastBlobUrl=null),this.stream=await navigator.mediaDevices.getUserMedia({audio:!0});const d=E1.getContext(),E=d.createMediaStreamSource(this.stream);return this.analyser=d.createAnalyser(),this.analyser.fftSize=64,E.connect(this.analyser),this.mediaRecorder=new MediaRecorder(this.stream),this.mediaRecorder.ondataavailable=o=>{o.data.size>0&&this.recordedChunks.push(o.data)},this.mediaRecorder.start(100),this.startPolling(),!0}catch{return!1}}async stop(){return new Promise(d=>{if(this.stopPolling(),!this.mediaRecorder||this.mediaRecorder.state==="inactive"){d(null);return}this.mediaRecorder.onstop=()=>{const E=new Blob(this.recordedChunks,{type:"audio/webm"});this.lastBlobUrl=URL.createObjectURL(E),this.cleanup(),this.listener&&this.listener({isRecording:!1,decibels:-60,amplitudes:[],recordedAudioUrl:this.lastBlobUrl}),d(this.lastBlobUrl)},this.mediaRecorder.stop()})}onStateChange(d){this.listener=d}startPolling(){var o;const d=new Uint8Array(((o=this.analyser)==null?void 0:o.frequencyBinCount)||32),E=()=>{if(!this.analyser)return;this.analyser.getByteFrequencyData(d);let M=0;const D=[];for(let k=0;k<d.length;k++){const lt=d[k]/255;D.push(lt),M+=lt*lt}const $=Math.sqrt(M/d.length),dt=Vr.calculateDecibels($);this.listener&&this.listener({isRecording:!0,decibels:dt,amplitudes:D,recordedAudioUrl:null}),this.animId=requestAnimationFrame(E)};this.animId=requestAnimationFrame(E)}stopPolling(){this.animId&&cancelAnimationFrame(this.animId),this.animId=null}cleanup(){this.stream&&(this.stream.getTracks().forEach(d=>d.stop()),this.stream=null),this.analyser=null,this.mediaRecorder=null}}const Yr=new Hv,Gr=new Bv,z1=({rule:T,onClose:d})=>{const[E,o]=xt.useState(0),[M,D]=xt.useState({isRecording:!1,decibels:-60,amplitudes:[],recordedAudioUrl:null});if(!T)return null;const $=T.examples[E]||T.examples[0],dt=()=>Yr.playUrl($.audioUrl),k=async()=>{M.isRecording?await Gr.stop():(Gr.onStateChange(D),await Gr.start())},lt=()=>{M.recordedAudioUrl&&Yr.playUrl(M.recordedAudioUrl)};return _.jsx(wr,{title:T.title,isOpen:!!T,onClose:d,children:_.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[_.jsx("div",{style:{display:"flex",gap:"var(--spacing-xs)",justifyContent:"center"},children:T.examples.map((Y,z)=>_.jsx("button",{onClick:()=>{o(z),Yr.stop()},style:{padding:"var(--spacing-xs) var(--spacing-md)",borderRadius:"var(--radius-pill)",border:"none",backgroundColor:z===E?T.colorToken:"var(--color-surface-subtle)",color:z===E?"var(--color-text-inverse)":"var(--color-text-primary)",fontWeight:700,cursor:"pointer"},children:Y.surahName},z))}),_.jsxs("div",{style:{backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-md)",borderRadius:"var(--radius-md)",textAlign:"center"},children:[_.jsx("div",{style:{fontFamily:"var(--font-quran)",fontSize:"1.8rem",lineHeight:2},children:$.text}),_.jsxs("div",{style:{marginTop:"var(--spacing-xs)",color:"var(--color-text-secondary)",fontSize:"0.9rem"},children:[mt.labelMakhraj,": ",_.jsx("strong",{children:T.makhraj})]})]}),_.jsx(jv,{amplitudes:M.amplitudes,isRecording:M.isRecording}),_.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-sm)"},children:[_.jsx(Su,{label:mt.btnListen,icon:h1,onClick:dt}),_.jsx(Su,{label:M.isRecording?mt.btnStopRecord:mt.btnRecord,icon:M.isRecording?Uv:Rv,variant:M.isRecording?"recording":"secondary",onClick:k}),M.recordedAudioUrl&&_.jsx(Su,{label:mt.btnCompare,icon:ky,variant:"success",onClick:lt})]})]})})},A1=()=>{const[T,d]=xt.useState(null);return _.jsxs("div",{style:{padding:"var(--spacing-md)",display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[T1.map(E=>_.jsx(p1,{rule:E,onSelect:()=>d(E)},E.id)),T&&_.jsx(z1,{rule:T,onClose:()=>d(null)})]})},Ov=[{number:1,nameArabic:"الفاتحة",nameEnglish:"Al-Fatiha",ayahsCount:7,type:"مكية"},{number:2,nameArabic:"البقرة",nameEnglish:"Al-Baqarah",ayahsCount:286,type:"مدنية"},{number:3,nameArabic:"آل عمران",nameEnglish:"Ali Imran",ayahsCount:200,type:"مدنية"},{number:4,nameArabic:"النساء",nameEnglish:"An-Nisa",ayahsCount:176,type:"مدنية"},{number:5,nameArabic:"المائدة",nameEnglish:"Al-Maidah",ayahsCount:120,type:"مدنية"},{number:6,nameArabic:"الأنعام",nameEnglish:"Al-Anam",ayahsCount:165,type:"مكية"},{number:7,nameArabic:"الأعراف",nameEnglish:"Al-Araf",ayahsCount:206,type:"مكية"},{number:8,nameArabic:"الأنفال",nameEnglish:"Al-Anfal",ayahsCount:75,type:"مدنية"},{number:9,nameArabic:"التوبة",nameEnglish:"At-Tawbah",ayahsCount:129,type:"مدنية"},{number:10,nameArabic:"يونس",nameEnglish:"Yunus",ayahsCount:109,type:"مكية"},{number:11,nameArabic:"هود",nameEnglish:"Hud",ayahsCount:123,type:"مكية"},{number:12,nameArabic:"يوسف",nameEnglish:"Yusuf",ayahsCount:111,type:"مكية"},{number:13,nameArabic:"الرعد",nameEnglish:"Ar-Rad",ayahsCount:43,type:"مدنية"},{number:14,nameArabic:"إبراهيم",nameEnglish:"Ibrahim",ayahsCount:52,type:"مكية"},{number:15,nameArabic:"الحجر",nameEnglish:"Al-Hijr",ayahsCount:99,type:"مكية"},{number:16,nameArabic:"النحل",nameEnglish:"An-Nahl",ayahsCount:128,type:"مكية"},{number:17,nameArabic:"الإسراء",nameEnglish:"Al-Isra",ayahsCount:111,type:"مكية"},{number:18,nameArabic:"الكهف",nameEnglish:"Al-Kahf",ayahsCount:110,type:"مكية"},{number:19,nameArabic:"مريم",nameEnglish:"Maryam",ayahsCount:98,type:"مكية"},{number:20,nameArabic:"طه",nameEnglish:"Taha",ayahsCount:135,type:"مكية"},{number:103,nameArabic:"العصر",nameEnglish:"Al-Asr",ayahsCount:3,type:"مكية"},{number:108,nameArabic:"الكوثر",nameEnglish:"Al-Kawthar",ayahsCount:3,type:"مكية"},{number:110,nameArabic:"النصر",nameEnglish:"An-Nasr",ayahsCount:3,type:"مدنية"},{number:112,nameArabic:"الإخلاص",nameEnglish:"Al-Ikhlas",ayahsCount:4,type:"مكية"},{number:113,nameArabic:"الفلق",nameEnglish:"Al-Falaq",ayahsCount:5,type:"مكية"},{number:114,nameArabic:"الناس",nameEnglish:"An-Nas",ayahsCount:6,type:"مكية"}],Ii=[{id:"minshawi_teacher",name:"المنشاوي (مع الترديد)",baseUrl:"https://everyayah.com/data/Minshawy_Teacher_128kbps"},{id:"husary_muallim",name:"الحصري (المصحف المعلم)",baseUrl:"https://everyayah.com/data/Husary_Muallim_128kbps"},{id:"ayman_suwaid",name:"أيمن سويد (تجويد تعليمي)",baseUrl:"https://everyayah.com/data/Ayman_Sowaid_64kbps"}],_1=[{surahNumber:1,ayahNumber:1,textUthmanic:"بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",tafseerMuyassar:"أبدأ قراءتي مستعيناً بالله الرحمن الرحيم.",audioFileName:"001001.mp3"},{surahNumber:1,ayahNumber:2,textUthmanic:"ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ",tafseerMuyassar:"الشكر والثناء الكامل لله خالق كل العوالم.",audioFileName:"001002.mp3"},{surahNumber:1,ayahNumber:3,textUthmanic:"ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",tafseerMuyassar:"ذو الرحمة الواسعة التي وسعت كل شيء.",audioFileName:"001003.mp3"},{surahNumber:1,ayahNumber:4,textUthmanic:"مَٰلِكِ يَوْمِ ٱلدِّينِ",tafseerMuyassar:"سبحانه وحده المالك ليوم القيامة والحساب.",audioFileName:"001004.mp3"},{surahNumber:112,ayahNumber:1,textUthmanic:"قُلْ هُوَ ٱللَّهُ أَحَدٌ",tafseerMuyassar:"قل يا محمد: الله واحد لا شريك له.",audioFileName:"112001.mp3"},{surahNumber:112,ayahNumber:2,textUthmanic:"ٱللَّهُ ٱلصَّمَدُ",tafseerMuyassar:"الذي يقصده كل الخلق في حاجاتهم.",audioFileName:"112002.mp3"},{surahNumber:112,ayahNumber:3,textUthmanic:"لَمْ يَلِدْ وَلَمْ يُولَدْ",tafseerMuyassar:"ليس له ولد وليس له والد سبحانه.",audioFileName:"112003.mp3"},{surahNumber:112,ayahNumber:4,textUthmanic:"وَلَمْ يَكُن لَّهُۥ كُفُوًا أَحَدٌۢ",tafseerMuyassar:"لا يماثله ولا يشبهه أحد في صفاته.",audioFileName:"112004.mp3"},{surahNumber:108,ayahNumber:1,textUthmanic:"إِنَّآ أَعْطَيْنَٰكَ ٱلْكَوْثَرَ",tafseerMuyassar:"أعطيناك يا محمد نهراً عظيماً في الجنة وخيراً كثيراً.",audioFileName:"108001.mp3"},{surahNumber:108,ayahNumber:2,textUthmanic:"فَصَلِّ لِرَبِّكَ وَٱنْحَرْ",tafseerMuyassar:"أخلص صلاتك وعبادتك وذبيحتك لله وحده.",audioFileName:"108002.mp3"},{surahNumber:108,ayahNumber:3,textUthmanic:"إِنَّ شَانِئَكَ هُوَ ٱلْأَبْتَرُ",tafseerMuyassar:"إن مبغضك هو المنقطع عن كل خير وذكر.",audioFileName:"108003.mp3"}];class M1{static async getAyahsForSurah(d){var o;const E=_1.filter(M=>M.surahNumber===d);if(E.length>0)return E;try{const M=`mouaz_surah_cache_${d}`,D=localStorage.getItem(M);if(D)return JSON.parse(D);const dt=await(await fetch(`https://api.alquran.cloud/v1/surah/${d}/quran-uthmani`)).json();if(dt.code===200&&((o=dt.data)!=null&&o.ayahs)){const k=dt.data.ayahs.map(lt=>{const Y=String(d).padStart(3,"0"),z=String(lt.numberInSurah).padStart(3,"0");return{surahNumber:d,ayahNumber:lt.numberInSurah,textUthmanic:lt.text,tafseerMuyassar:"تفسير ميسر للآية الكريمة ليتدبر الطفل معانيها الجميلة.",audioFileName:`${Y}${z}.mp3`}});return localStorage.setItem(M,JSON.stringify(k)),k}}catch{}return E}}const O1=({ayah:T,isPlaying:d,onPlayToggle:E,onOpenTafseer:o})=>_.jsxs(Tu,{active:d,children:[_.jsxs("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"},children:[_.jsx("span",{style:{backgroundColor:"var(--color-surface-subtle)",borderRadius:"var(--radius-pill)",width:"32px",height:"32px",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:"0.9rem"},children:T.ayahNumber}),_.jsxs("div",{style:{display:"flex",gap:"var(--spacing-sm)"},children:[_.jsx("button",{onClick:E,style:{backgroundColor:d?"var(--color-brand-primary)":"var(--color-surface-subtle)",color:d?"var(--color-text-inverse)":"var(--color-brand-primary)",border:"none",borderRadius:"var(--radius-pill)",width:"36px",height:"36px",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"},children:d?_.jsx(a1,{size:18}):_.jsx(u1,{size:18})}),_.jsx("button",{onClick:o,style:{backgroundColor:"var(--color-surface-subtle)",border:"none",borderRadius:"var(--radius-pill)",width:"36px",height:"36px",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--color-brand-secondary)"},children:_.jsx(xv,{size:18})})]})]}),_.jsx("div",{style:{marginTop:"var(--spacing-md)",textAlign:"center",fontFamily:"var(--font-quran)",fontSize:"1.6rem",lineHeight:"2.4",color:d?"var(--color-brand-primary)":"var(--color-text-primary)"},children:T.textUthmanic})]}),N1=({ayah:T,onClose:d})=>_.jsx(wr,{title:mt.tafseerTitle,isOpen:!!T,onClose:d,children:T&&_.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[_.jsx("div",{style:{textAlign:"center",fontFamily:"var(--font-quran)",fontSize:"1.5rem",lineHeight:2},children:T.textUthmanic}),_.jsx("div",{style:{backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-md)",borderRadius:"var(--radius-md)",lineHeight:1.8,color:"var(--color-text-secondary)"},children:T.tafseerMuyassar})]})}),C1=({activeReciterId:T,onSelectReciter:d,isRepeating:E,onToggleRepeat:o})=>_.jsxs("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"var(--spacing-sm) var(--spacing-md)",backgroundColor:"var(--color-surface-primary)",borderRadius:"var(--radius-md)",border:"1.5px solid var(--color-surface-interactive)",marginBottom:"var(--spacing-md)"},children:[_.jsxs("div",{style:{display:"flex",alignItems:"center",gap:"var(--spacing-xs)"},children:[_.jsx(v1,{size:18,color:"var(--color-brand-primary)"}),_.jsx("select",{value:T,onChange:M=>d(M.target.value),style:{border:"none",fontFamily:"var(--font-general)",fontWeight:700,fontSize:"0.9rem",backgroundColor:"transparent",color:"var(--color-text-primary)",outline:"none",cursor:"pointer"},children:Ii.map(M=>_.jsx("option",{value:M.id,children:M.name},M.id))})]}),_.jsxs("button",{onClick:o,style:{display:"flex",alignItems:"center",gap:"var(--spacing-xs)",backgroundColor:E?"var(--color-brand-primary)":"var(--color-surface-subtle)",color:E?"var(--color-text-inverse)":"var(--color-text-secondary)",border:"none",padding:"var(--spacing-xs) var(--spacing-md)",borderRadius:"var(--radius-pill)",cursor:"pointer",fontWeight:700,fontSize:"0.85rem"},children:[_.jsx(i1,{size:16}),_.jsx("span",{children:mt.btnRepeat})]})]}),Sn=new Hv,x1=()=>{const[T,d]=xt.useState(Ov[0]),[E,o]=xt.useState([]),[M,D]=xt.useState(null),[$,dt]=xt.useState(null),[k,lt]=xt.useState(Ii[0].id),[Y,z]=xt.useState(!1);xt.useEffect(()=>{M1.getAyahsForSurah(T.number).then(o),Sn.stop(),D(null)},[T]);const V=Ii.find(ct=>ct.id===k)||Ii[0],yt=ct=>{if(M===ct.ayahNumber)Sn.stop(),D(null);else{D(ct.ayahNumber);const Vt=`${V.baseUrl}/${ct.audioFileName}`;Sn.playUrl(Vt),Sn.onStateChange(F=>{F.status==="completed"&&(Y?Sn.playUrl(Vt):D(null))})}};return _.jsxs("div",{style:{padding:"var(--spacing-md)"},children:[_.jsx("div",{style:{display:"flex",gap:"var(--spacing-sm)",overflowX:"auto",paddingBottom:"var(--spacing-sm)",marginBottom:"var(--spacing-sm)"},children:Ov.map(ct=>_.jsx("button",{onClick:()=>d(ct),style:{padding:"var(--spacing-xs) var(--spacing-md)",borderRadius:"var(--radius-pill)",border:"none",backgroundColor:ct.number===T.number?"var(--color-brand-primary)":"var(--color-surface-subtle)",color:ct.number===T.number?"var(--color-text-inverse)":"var(--color-text-primary)",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"},children:ct.nameArabic},ct.number))}),_.jsx(C1,{activeReciterId:k,onSelectReciter:lt,isRepeating:Y,onToggleRepeat:()=>z(!Y)}),_.jsx("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:E.map(ct=>_.jsx(O1,{ayah:ct,isPlaying:M===ct.ayahNumber,onPlayToggle:()=>yt(ct),onOpenTafseer:()=>dt(ct)},ct.ayahNumber))}),_.jsx(N1,{ayah:$,onClose:()=>dt(null)})]})},$i=[{id:1,type:"theory",prompt:"ما هو حكم النون الساكنة في (مِن مَالٍ)؟",options:["الإدغام","الإظهار","الإقلاب"],correctAnswer:"الإدغام"},{id:2,type:"theory",prompt:"حروف القلقلة مجموعة في كلمة:",options:["قُطْبُ جَدٍّ","يَرْمَلُونَ","حَيٌّ خَبِيرٌ"],correctAnswer:"قُطْبُ جَدٍّ"},{id:3,type:"gapFill",prompt:"أكمل الآية الكريمة بالكلمة الصحيحة:",targetVerse:"ٱللَّهُ _____",options:["ٱلصَّمَدُ","ٱلْأَحَدُ","ٱلْعَظِيمُ"],correctAnswer:"ٱلصَّمَدُ"},{id:4,type:"gapFill",prompt:"أكمل الآية الكريمة بالكلمة الصحيحة:",targetVerse:"إِنَّآ أَعْطَيْنَٰكَ _____",options:["ٱلْكَوْثَرَ","ٱلنَّصْرَ","ٱلْفَتْحَ"],correctAnswer:"ٱلكَوْثَرَ"},{id:5,type:"voice",prompt:"رتل الآية الكريمة بإتقان ومخارج واضحة:",targetVerse:"قُلْ هُوَ ٱللَّهُ أَحَدٌ",correctAnswer:"قُلْ هُوَ ٱللَّهُ أَحَدٌ"}],R1=({prompt:T,options:d,selectedOption:E,onSelectOption:o})=>_.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[_.jsx(Tu,{children:_.jsx("h3",{style:{fontSize:"1.2rem",textAlign:"center",lineHeight:1.6},children:T})}),_.jsx("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-sm)"},children:d.map(M=>_.jsx(Tu,{active:E===M,onClick:()=>o(M),children:_.jsx("div",{style:{textAlign:"center",fontWeight:700,fontSize:"1.1rem"},children:M})},M))})]}),U1=({verseText:T,isRecording:d,amplitudes:E,onStartRecord:o,onStopRecord:M})=>_.jsxs("div",{style:{display:"flex",flexDirection:"column",gap:"var(--spacing-lg)"},children:[_.jsxs(Tu,{children:[_.jsx("p",{style:{textAlign:"center",color:"var(--color-text-secondary)",marginBottom:"var(--spacing-sm)"},children:mt.promptSpeak}),_.jsx("div",{style:{textAlign:"center",fontFamily:"var(--font-quran)",fontSize:"1.8rem",color:"var(--color-brand-primary)"},children:T})]}),_.jsx(jv,{amplitudes:E,isRecording:d}),_.jsx(Su,{label:d?mt.btnStopRecord:mt.btnRecord,icon:d?Uv:Rv,variant:d?"recording":"primary",onClick:d?M:o})]});var Kr={};(function T(d,E,o,M){var D=!!(d.Worker&&d.Blob&&d.Promise&&d.OffscreenCanvas&&d.OffscreenCanvasRenderingContext2D&&d.HTMLCanvasElement&&d.HTMLCanvasElement.prototype.transferControlToOffscreen&&d.URL&&d.URL.createObjectURL),$=typeof Path2D=="function"&&typeof DOMMatrix=="function",dt=(function(){if(!d.OffscreenCanvas)return!1;try{var g=new OffscreenCanvas(1,1),v=g.getContext("2d");v.fillRect(0,0,1,1);var Q=g.transferToImageBitmap();v.createPattern(Q,"no-repeat")}catch{return!1}return!0})();function k(){}function lt(g){var v=E.exports.Promise,Q=v!==void 0?v:d.Promise;return typeof Q=="function"?new Q(g):(g(k,k),null)}var Y=(function(g,v){return{transform:function(Q){if(g)return Q;if(v.has(Q))return v.get(Q);var w=new OffscreenCanvas(Q.width,Q.height),r=w.getContext("2d");return r.drawImage(Q,0,0),v.set(Q,w),w},clear:function(){v.clear()}}})(dt,new Map),z=(function(){var g=Math.floor(16.666666666666668),v,Q,w={},r=0;return typeof requestAnimationFrame=="function"&&typeof cancelAnimationFrame=="function"?(v=function(A){var x=Math.random();return w[x]=requestAnimationFrame(function C(H){r===H||r+g-1<H?(r=H,delete w[x],A()):w[x]=requestAnimationFrame(C)}),x},Q=function(A){w[A]&&cancelAnimationFrame(w[A])}):(v=function(A){return setTimeout(A,g)},Q=function(A){return clearTimeout(A)}),{frame:v,cancel:Q}})(),V=(function(){var g,v,Q={};function w(r){function A(x,C){r.postMessage({options:x||{},callback:C})}r.init=function(C){var H=C.transferControlToOffscreen();r.postMessage({canvas:H},[H])},r.fire=function(C,H,X){if(v)return A(C,null),v;var Z=Math.random().toString(36).slice(2);return v=lt(function(R){function B(_t){_t.data.callback===Z&&(delete Q[Z],r.removeEventListener("message",B),v=null,Y.clear(),X(),R())}r.addEventListener("message",B),A(C,Z),Q[Z]=B.bind(null,{data:{callback:Z}})}),v},r.reset=function(){r.postMessage({reset:!0});for(var C in Q)Q[C](),delete Q[C]}}return function(){if(g)return g;if(!o&&D){var r=["var CONFETTI, SIZE = {}, module = {};","("+T.toString()+")(this, module, true, SIZE);","onmessage = function(msg) {","  if (msg.data.options) {","    CONFETTI(msg.data.options).then(function () {","      if (msg.data.callback) {","        postMessage({ callback: msg.data.callback });","      }","    });","  } else if (msg.data.reset) {","    CONFETTI && CONFETTI.reset();","  } else if (msg.data.resize) {","    SIZE.width = msg.data.resize.width;","    SIZE.height = msg.data.resize.height;","  } else if (msg.data.canvas) {","    SIZE.width = msg.data.canvas.width;","    SIZE.height = msg.data.canvas.height;","    CONFETTI = module.exports.create(msg.data.canvas);","  }","}"].join(`
 `);try{g=new Worker(URL.createObjectURL(new Blob([r])))}catch(A){return typeof console<"u"&&typeof console.warn=="function"&&console.warn("🎊 Could not load worker",A),null}w(g)}return g}})(),yt={particleCount:50,angle:90,spread:45,startVelocity:45,decay:.9,gravity:1,drift:0,ticks:200,x:.5,y:.5,shapes:["square","circle"],zIndex:100,colors:["#26ccff","#a25afd","#ff5e7e","#88ff5a","#fcff42","#ffa62d","#ff36ff"],disableForReducedMotion:!1,scalar:1};function ct(g,v){return v?v(g):g}function Vt(g){return g!=null}function F(g,v,Q){return ct(g&&Vt(g[v])?g[v]:yt[v],Q)}function dl(g){return g<0?0:Math.floor(g)}function ul(g,v){return Math.floor(Math.random()*(v-g))+g}function wl(g){return parseInt(g,16)}function Dl(g){return g.map(jl)}function jl(g){var v=String(g).replace(/[^0-9a-f]/gi,"");return v.length<6&&(v=v[0]+v[0]+v[1]+v[1]+v[2]+v[2]),{r:wl(v.substring(0,2)),g:wl(v.substring(2,4)),b:wl(v.substring(4,6))}}function nl(g){var v=F(g,"origin",Object);return v.x=F(v,"x",Number),v.y=F(v,"y",Number),v}function at(g){g.width=document.documentElement.clientWidth,g.height=document.documentElement.clientHeight}function vt(g){var v=g.getBoundingClientRect();g.width=v.width,g.height=v.height}function Hl(g){var v=document.createElement("canvas");return v.style.position="fixed",v.style.top="0px",v.style.left="0px",v.style.pointerEvents="none",v.style.zIndex=g,v}function vl(g,v,Q,w,r,A,x,C,H){g.save(),g.translate(v,Q),g.rotate(A),g.scale(w,r),g.arc(0,0,1,x,C,H),g.restore()}function ml(g){var v=g.angle*(Math.PI/180),Q=g.spread*(Math.PI/180);return{x:g.x,y:g.y,wobble:Math.random()*10,wobbleSpeed:Math.min(.11,Math.random()*.1+.05),velocity:g.startVelocity*.5+Math.random()*g.startVelocity,angle2D:-v+(.5*Q-Math.random()*Q),tiltAngle:(Math.random()*(.75-.25)+.25)*Math.PI,color:g.color,shape:g.shape,tick:0,totalTicks:g.ticks,decay:g.decay,drift:g.drift,random:Math.random()+2,tiltSin:0,tiltCos:0,wobbleX:0,wobbleY:0,gravity:g.gravity*3,ovalScalar:.6,scalar:g.scalar,flat:g.flat}}function il(g,v){v.x+=Math.cos(v.angle2D)*v.velocity+v.drift,v.y+=Math.sin(v.angle2D)*v.velocity+v.gravity,v.velocity*=v.decay,v.flat?(v.wobble=0,v.wobbleX=v.x+10*v.scalar,v.wobbleY=v.y+10*v.scalar,v.tiltSin=0,v.tiltCos=0,v.random=1):(v.wobble+=v.wobbleSpeed,v.wobbleX=v.x+10*v.scalar*Math.cos(v.wobble),v.wobbleY=v.y+10*v.scalar*Math.sin(v.wobble),v.tiltAngle+=.1,v.tiltSin=Math.sin(v.tiltAngle),v.tiltCos=Math.cos(v.tiltAngle),v.random=Math.random()+2);var Q=v.tick++/v.totalTicks,w=v.x+v.random*v.tiltCos,r=v.y+v.random*v.tiltSin,A=v.wobbleX+v.random*v.tiltCos,x=v.wobbleY+v.random*v.tiltSin;if(g.fillStyle="rgba("+v.color.r+", "+v.color.g+", "+v.color.b+", "+(1-Q)+")",g.beginPath(),$&&v.shape.type==="path"&&typeof v.shape.path=="string"&&Array.isArray(v.shape.matrix))g.fill(K(v.shape.path,v.shape.matrix,v.x,v.y,Math.abs(A-w)*.1,Math.abs(x-r)*.1,Math.PI/10*v.wobble));else if(v.shape.type==="bitmap"){var C=Math.PI/10*v.wobble,H=Math.abs(A-w)*.1,X=Math.abs(x-r)*.1,Z=v.shape.bitmap.width*v.scalar,R=v.shape.bitmap.height*v.scalar,B=new DOMMatrix([Math.cos(C)*H,Math.sin(C)*H,-Math.sin(C)*X,Math.cos(C)*X,v.x,v.y]);B.multiplySelf(new DOMMatrix(v.shape.matrix));var _t=g.createPattern(Y.transform(v.shape.bitmap),"no-repeat");_t.setTransform(B),g.globalAlpha=1-Q,g.fillStyle=_t,g.fillRect(v.x-Z/2,v.y-R/2,Z,R),g.globalAlpha=1}else if(v.shape==="circle")g.ellipse?g.ellipse(v.x,v.y,Math.abs(A-w)*v.ovalScalar,Math.abs(x-r)*v.ovalScalar,Math.PI/10*v.wobble,0,2*Math.PI):vl(g,v.x,v.y,Math.abs(A-w)*v.ovalScalar,Math.abs(x-r)*v.ovalScalar,Math.PI/10*v.wobble,0,2*Math.PI);else if(v.shape==="star")for(var ut=Math.PI/2*3,Bt=4*v.scalar,Dt=8*v.scalar,Tt=v.x,ft=v.y,Zt=5,al=Math.PI/Zt;Zt--;)Tt=v.x+Math.cos(ut)*Dt,ft=v.y+Math.sin(ut)*Dt,g.lineTo(Tt,ft),ut+=al,Tt=v.x+Math.cos(ut)*Bt,ft=v.y+Math.sin(ut)*Bt,g.lineTo(Tt,ft),ut+=al;else g.moveTo(Math.floor(v.x),Math.floor(v.y)),g.lineTo(Math.floor(v.wobbleX),Math.floor(r)),g.lineTo(Math.floor(A),Math.floor(x)),g.lineTo(Math.floor(w),Math.floor(v.wobbleY));return g.closePath(),g.fill(),v.tick<v.totalTicks}function Pl(g,v,Q,w,r){var A=v.slice(),x=g.getContext("2d"),C,H,X=lt(function(Z){function R(){C=H=null,x.clearRect(0,0,w.width,w.height),Y.clear(),r(),Z()}function B(){o&&!(w.width===M.width&&w.height===M.height)&&(w.width=g.width=M.width,w.height=g.height=M.height),!w.width&&!w.height&&(Q(g),w.width=g.width,w.height=g.height),x.clearRect(0,0,w.width,w.height),A=A.filter(function(_t){return il(x,_t)}),A.length?C=z.frame(B):R()}C=z.frame(B),H=R});return{addFettis:function(Z){return A=A.concat(Z),X},canvas:g,promise:X,reset:function(){C&&z.cancel(C),H&&H()}}}function ta(g,v){var Q=!g,w=!!F(v||{},"resize"),r=!1,A=F(v,"disableForReducedMotion",Boolean),x=D&&!!F(v||{},"useWorker"),C=x?V():null,H=Q?at:vt,X=g&&C?!!g.__confetti_initialized:!1,Z=typeof matchMedia=="function"&&matchMedia("(prefers-reduced-motion)").matches,R;function B(ut,Bt,Dt){for(var Tt=F(ut,"particleCount",dl),ft=F(ut,"angle",Number),Zt=F(ut,"spread",Number),al=F(ut,"startVelocity",Number),la=F(ut,"decay",Number),Oe=F(ut,"gravity",Number),Ne=F(ut,"drift",Number),va=F(ut,"colors",Dl),pu=F(ut,"ticks",Number),ae=F(ut,"shapes"),Eu=F(ut,"scalar"),pn=!!F(ut,"flat"),Kl=nl(ut),Ce=Tt,ee=[],tc=g.width*Kl.x,En=g.height*Kl.y;Ce--;)ee.push(ml({x:tc,y:En,angle:ft,spread:Zt,startVelocity:al,color:va[Ce%va.length],shape:ae[ul(0,ae.length)],ticks:pu,decay:la,gravity:Oe,drift:Ne,scalar:Eu,flat:pn}));return R?R.addFettis(ee):(R=Pl(g,ee,H,Bt,Dt),R.promise)}function _t(ut){var Bt=A||F(ut,"disableForReducedMotion",Boolean),Dt=F(ut,"zIndex",Number);if(Bt&&Z)return lt(function(al){al()});Q&&R?g=R.canvas:Q&&!g&&(g=Hl(Dt),document.body.appendChild(g)),w&&!X&&H(g);var Tt={width:g.width,height:g.height};C&&!X&&C.init(g),X=!0,C&&(g.__confetti_initialized=!0);function ft(){if(C){var al={getBoundingClientRect:function(){if(!Q)return g.getBoundingClientRect()}};H(al),C.postMessage({resize:{width:al.width,height:al.height}});return}Tt.width=Tt.height=null}function Zt(){R=null,w&&(r=!1,d.removeEventListener("resize",ft)),Q&&g&&(document.body.contains(g)&&document.body.removeChild(g),g=null,X=!1)}return w&&!r&&(r=!0,d.addEventListener("resize",ft,!1)),C?C.fire(ut,Tt,Zt):B(ut,Tt,Zt)}return _t.reset=function(){C&&C.reset(),R&&R.reset()},_t}var Ut;function j(){return Ut||(Ut=ta(null,{useWorker:!0,resize:!0})),Ut}function K(g,v,Q,w,r,A,x){var C=new Path2D(g),H=new Path2D;H.addPath(C,new DOMMatrix(v));var X=new Path2D;return X.addPath(H,new DOMMatrix([Math.cos(x)*r,Math.sin(x)*r,-Math.sin(x)*A,Math.cos(x)*A,Q,w])),X}function W(g){if(!$)throw new Error("path confetti are not supported in this browser");var v,Q;typeof g=="string"?v=g:(v=g.path,Q=g.matrix);var w=new Path2D(v),r=document.createElement("canvas"),A=r.getContext("2d");if(!Q){for(var x=1e3,C=x,H=x,X=0,Z=0,R,B,_t=0;_t<x;_t+=2)for(var ut=0;ut<x;ut+=2)A.isPointInPath(w,_t,ut,"nonzero")&&(C=Math.min(C,_t),H=Math.min(H,ut),X=Math.max(X,_t),Z=Math.max(Z,ut));R=X-C,B=Z-H;var Bt=10,Dt=Math.min(Bt/R,Bt/B);Q=[Dt,0,0,Dt,-Math.round(R/2+C)*Dt,-Math.round(B/2+H)*Dt]}return{type:"path",path:v,matrix:Q}}function St(g){var v,Q=1,w="#000000",r='"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", "EmojiOne Color", "Android Emoji", "Twemoji Mozilla", "system emoji", sans-serif';typeof g=="string"?v=g:(v=g.text,Q="scalar"in g?g.scalar:Q,r="fontFamily"in g?g.fontFamily:r,w="color"in g?g.color:w);var A=10*Q,x=""+A+"px "+r,C=new OffscreenCanvas(A,A),H=C.getContext("2d");H.font=x;var X=H.measureText(v),Z=Math.ceil(X.actualBoundingBoxRight+X.actualBoundingBoxLeft),R=Math.ceil(X.actualBoundingBoxAscent+X.actualBoundingBoxDescent),B=2,_t=X.actualBoundingBoxLeft+B,ut=X.actualBoundingBoxAscent+B;Z+=B+B,R+=B+B,C=new OffscreenCanvas(Z,R),H=C.getContext("2d"),H.font=x,H.fillStyle=w,H.fillText(v,_t,ut);var Bt=1/Q;return{type:"bitmap",bitmap:C.transferToImageBitmap(),matrix:[Bt,0,0,Bt,-Z*Bt/2,-R*Bt/2]}}E.exports=function(){return j().apply(this,arguments)},E.exports.reset=function(){j().reset()},E.exports.create=ta,E.exports.shapeFromPath=W,E.exports.shapeFromText=St})((function(){return typeof window<"u"?window:typeof self<"u"?self:this||{}})(),Kr,!1);const D1=Kr.exports;Kr.exports.create;const j1=({isOpen:T,isCorrect:d,stars:E,correctAnswerText:o,onNext:M})=>(xt.useEffect(()=>{T&&d&&D1({particleCount:70,spread:80,origin:{y:.6}})},[T,d]),_.jsx(wr,{title:mt.quizTitle,isOpen:T,onClose:M,children:_.jsxs("div",{style:{textAlign:"center",display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[_.jsx("h3",{style:{fontSize:"1.5rem",fontWeight:800,color:d?"var(--color-feedback-success)":"var(--color-feedback-alert)"},children:d?mt.feedbackSuccess:mt.feedbackTryAgain}),_.jsx("div",{style:{display:"flex",justifyContent:"center",gap:"var(--spacing-xs)"},children:[1,2,3].map(D=>_.jsx(Zr,{size:40,color:D<=E?"var(--color-reward-gold)":"var(--color-surface-interactive)",fill:D<=E?"var(--color-reward-gold)":"transparent"},D))}),!d&&o&&_.jsxs("div",{style:{backgroundColor:"var(--color-surface-subtle)",padding:"var(--spacing-md)",borderRadius:"var(--radius-md)"},children:[_.jsxs("span",{style:{color:"var(--color-text-secondary)",fontSize:"0.9rem"},children:[mt.correctAnswerWas,":"]}),_.jsx("div",{style:{fontWeight:800,marginTop:"var(--spacing-xs)",color:"var(--color-brand-primary)"},children:o})]}),_.jsx(Su,{label:d?mt.btnNext:mt.btnRetry,variant:d?"primary":"secondary",onClick:M})]})})),ki={PROGRESS:"mouaz_child_progress",SELECTED_RECITER:"mouaz_active_reciter"};class Tn{static getProgress(){try{const d=localStorage.getItem(ki.PROGRESS);return d?JSON.parse(d):{}}catch{return{}}}static saveAyahProgress(d){const E=this.getProgress(),o=`${d.surahNumber}_${d.ayahNumber}`,M=E[o];E[o]={surahNumber:d.surahNumber,ayahNumber:d.ayahNumber,stars:Math.max((M==null?void 0:M.stars)||0,d.stars),isMastered:(M==null?void 0:M.isMastered)||!1||d.isMastered},localStorage.setItem(ki.PROGRESS,JSON.stringify(E))}static getTotalStars(){return Object.values(this.getProgress()).reduce((E,o)=>E+o.stars,0)}static getMasteredCount(){return Object.values(this.getProgress()).filter(E=>E.isMastered).length}static getActiveReciterId(){return localStorage.getItem(ki.SELECTED_RECITER)||"minshawi_teacher"}static setActiveReciterId(d){localStorage.setItem(ki.SELECTED_RECITER,d)}}const Qr=new Bv,H1=()=>{const[T,d]=xt.useState(0),[E,o]=xt.useState(null),[M,D]=xt.useState({isRecording:!1,decibels:-60,amplitudes:[],recordedAudioUrl:null}),[$,dt]=xt.useState({isOpen:!1,isCorrect:!1,stars:0}),k=$i[T]||$i[0],lt=()=>{if(!E)return;const yt=E===k.correctAnswer,ct=yt?3:0;yt&&Tn.saveAyahProgress({surahNumber:1,ayahNumber:T+1,stars:ct,isMastered:!0}),dt({isOpen:!0,isCorrect:yt,stars:ct})},Y=async()=>{Qr.onStateChange(D),await Qr.start()},z=async()=>{await Qr.stop();const yt=3;Tn.saveAyahProgress({surahNumber:1,ayahNumber:T+1,stars:yt,isMastered:!0}),dt({isOpen:!0,isCorrect:!0,stars:yt})},V=()=>{dt({isOpen:!1,isCorrect:!1,stars:0}),o(null),$.isCorrect&&d(yt=>(yt+1)%$i.length)};return _.jsxs("div",{style:{padding:"var(--spacing-md)",display:"flex",flexDirection:"column",gap:"var(--spacing-md)"},children:[_.jsx("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"},children:_.jsxs("span",{style:{fontWeight:800,color:"var(--color-brand-primary)"},children:[mt.quizTitle," (",T+1,"/",$i.length,")"]})}),k.type==="voice"?_.jsx(U1,{verseText:k.targetVerse||"",isRecording:M.isRecording,amplitudes:M.amplitudes,onStartRecord:Y,onStopRecord:z}):_.jsxs(_.Fragment,{children:[_.jsx(R1,{prompt:k.prompt,options:k.options||[],selectedOption:E,onSelectOption:o}),E&&_.jsx(Su,{label:mt.btnSubmit,onClick:lt})]}),_.jsx(j1,{isOpen:$.isOpen,isCorrect:$.isCorrect,stars:$.stars,correctAnswerText:k.correctAnswer,onNext:V})]})};class B1{static calculateProgressRatio(d,E){return E<=0||d<=0?0:Math.max(0,Math.min(1,d/E))}static calculatePercentage(d,E){const o=this.calculateProgressRatio(d,E);return Math.round(o*100)}static calculateEarnedStars(d){return d>=85?3:d>=65?2:d>=40?1:0}static calculateXpReward(d,E,o){let M=d*E;return o&&E===3&&(M+=50),M}static calculateTreeStage(d,E=3){if(E<=0||d<=0)return 1;const o=Math.floor(d/E)+1;return Math.max(1,Math.min(5,o))}}const q1=()=>{const T=Tn.getTotalStars(),d=Tn.getMasteredCount(),E=B1.calculateTreeStage(d,2);return _.jsx("div",{style:{padding:"var(--spacing-md)"},children:_.jsx(Tu,{borderColor:"var(--color-tajweed-ghunnah)",children:_.jsxs("div",{style:{textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:"var(--spacing-sm)"},children:[_.jsx("h2",{style:{fontSize:"1.4rem",fontWeight:800},children:mt.treeTitle}),_.jsx("p",{style:{color:"var(--color-text-secondary)",fontSize:"0.95rem"},children:mt.treeSubtitle}),_.jsx("div",{style:{margin:"var(--spacing-md) 0",width:"120px",height:"120px",borderRadius:"var(--radius-pill)",backgroundColor:"var(--color-surface-subtle)",display:"flex",alignItems:"center",justifyContent:"center"},children:_.jsx(Dv,{size:64,color:"var(--color-tajweed-ghunnah)"})}),_.jsxs("div",{style:{display:"flex",gap:"var(--spacing-md)"},children:[_.jsxs("div",{style:{display:"flex",alignItems:"center",gap:"var(--spacing-xs)"},children:[_.jsx(Zr,{size:20,color:"var(--color-reward-gold)",fill:"var(--color-reward-gold)"}),_.jsxs("span",{style:{fontWeight:800},children:[T," ",mt.labelStars]})]}),_.jsx("span",{style:{color:"var(--color-surface-interactive)"},children:"|"}),_.jsxs("span",{style:{fontWeight:700,color:"var(--color-brand-primary)"},children:[mt.stageLevel," ",E]})]})]})})})},Y1=()=>{const[T,d]=xt.useState("learn"),E=Tn.getTotalStars(),o=()=>{switch(T){case"tarteel":return mt.tarteelTitle;case"quiz":return mt.quizTitle;case"progress":return mt.treeTitle;default:return mt.learnTitle}};return _.jsxs("div",{style:{maxWidth:"600px",margin:"0 auto",minHeight:"100vh",paddingBottom:"70px"},children:[_.jsx(b1,{title:o(),starsCount:E}),_.jsxs("main",{children:[T==="learn"&&_.jsx(A1,{}),T==="tarteel"&&_.jsx(x1,{}),T==="quiz"&&_.jsx(H1,{}),T==="progress"&&_.jsx(q1,{})]}),_.jsx(S1,{currentTab:T,onTabChange:d})]})};wy.createRoot(document.getElementById("root")).render(_.jsx(qy.StrictMode,{children:_.jsx(Y1,{})}));
+
+
+============================================================
+FILE PATH: docs\assets\index-Dk_t4cdH.css
+============================================================
+:root{--color-canvas-bg: #F8FAFC;--color-surface-primary: #FFFFFF;--color-surface-subtle: #F1F5F9;--color-surface-interactive: #E2E8F0;--color-brand-primary: #4F46E5;--color-brand-secondary: #0EA5E9;--color-brand-accent: #F59E0B;--color-feedback-success: #10B981;--color-feedback-alert: #EF4444;--color-feedback-warning: #F97316;--color-reward-gold: #FBBF24;--color-text-primary: #0F172A;--color-text-secondary: #475569;--color-text-muted: #94A3B8;--color-text-inverse: #FFFFFF;--color-tajweed-ghunnah: #16A34A;--color-tajweed-qalqalah: #2563EB;--color-tajweed-ikhfa: #EA580C;--color-tajweed-idgham: #7C3AED;--color-tajweed-madd: #DC2626;--color-wave-active: #3B82F6;--color-wave-inactive: #CBD5E1;--color-mic-recording: #E11D48;--spacing-xs: 4px;--spacing-sm: 8px;--spacing-md: 16px;--spacing-lg: 24px;--spacing-xl: 32px;--radius-sm: 8px;--radius-md: 16px;--radius-lg: 24px;--radius-pill: 9999px;--font-quran: "Amiri Quran", serif;--font-general: "Cairo", sans-serif}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}body{background-color:var(--color-canvas-bg);color:var(--color-text-primary);font-family:var(--font-general);-webkit-user-select:none;user-select:none;min-height:100vh}
+
